@@ -2,3 +2,4 @@
 .wrangler2/
 node_modules/
 .dev.vars
+.wr*/

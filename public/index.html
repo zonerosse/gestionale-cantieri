@@ -237,6 +237,15 @@ details.sz{margin-bottom:8px}
 header h1 span{display:block;font-size:13px;font-weight:400;opacity:.85}
 header h1 a{color:#fff;text-decoration:underline;cursor:pointer}
 body.opv header{background:var(--indaco)}
+.who{display:flex;align-items:center;gap:14px;width:100%;border:1px solid var(--line);background:#fff;border-radius:14px;padding:14px;margin:8px 0;font:inherit;font-size:18px;font-weight:600;color:var(--text);cursor:pointer;text-align:left}
+.who.big{padding:22px 16px;font-size:22px}.who .ico{width:44px;height:44px}.who .ico svg{width:24px;height:24px}
+.wait{text-align:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin:10px 0}
+.wait-n{font-size:20px;font-weight:700;margin:10px 0}.wait-c{font-size:44px;font-weight:800;letter-spacing:.15em;color:var(--blu);margin:4px 0 8px}
+.cod-in{font-size:18px;letter-spacing:.1em;color:var(--blu)}
+.pin-d{font-size:34px;letter-spacing:.3em;text-align:center;margin:10px 0;color:var(--blu)}.pin-d span{color:var(--line)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:320px;margin:0 auto 14px}
+.pad button{font:inherit;font-size:26px;font-weight:600;padding:16px 0;border:1px solid var(--line);border-radius:12px;background:#fff;cursor:pointer;color:var(--text)}
+.who.on{border:2px solid var(--blu);background:#f4f7fa}.lg-c{font-size:12px;font-weight:700;color:var(--muted);width:30px}.lg-s{color:var(--verde);font-weight:700}
 </style>
 </head>
 <body>
@@ -626,58 +635,81 @@ REQ=null;var REQQ=[],MSGS=[],NOTIF={},TIMB={};
 /* orologio della prova: l'ora vera se è orario di lavoro (7:00–16:30), altrimenti le 10:40 */
 function adesso(){var d=new Date(),m=d.getHours()*60+d.getMinutes();if(m<420||m>990)return '10:40';return d.getHours()+':'+('0'+d.getMinutes()).slice(-2);}
 ADESSO=adesso();QD.ora[0]='Da adesso ('+ADESSO+')';QD.ora[1]=ADESSO;
-/* ===== ONLINE: dati su Cloudflare (D1), accesso con link personale ?k= ===== */
-var ROLE=null,VER=0,TOK='',ACC=null,BUSYS=false,DIRTY=false,ERRS='';
-(function(){var u=new URLSearchParams(location.search).get('k');try{if(u)localStorage.setItem('cantieriK',u);TOK=u||localStorage.getItem('cantieriK')||'';}catch(e){TOK=u||'';}})();
-function stato(){return {CANT:CANT,PERS:PERS,TODO:TODO,AVV:AVV,REQ:REQ,REQQ:REQQ,RISP:RISP,MSGS:MSGS,NOTIF:NOTIF,accessi:ACC||undefined};}
+/* ===== ONLINE: accessi come nel gestionale dei ristoranti (dispositivi approvati dal titolare) ===== */
+var ROLE=null,VER=0,ME=null,DISP=[],BUSYS=false,DIRTY=false,ERRS='',PICK=null,PINTXT='';
+try{ME=JSON.parse(localStorage.getItem('cantieriDisp')||'null');}catch(e){}
+function meSave(){try{if(ME)localStorage.setItem('cantieriDisp',JSON.stringify(ME));else localStorage.removeItem('cantieriDisp');}catch(e){}}
+function stato(){return {CANT:CANT,PERS:PERS,TODO:TODO,AVV:AVV,REQ:REQ,REQQ:REQQ,RISP:RISP,MSGS:MSGS,NOTIF:NOTIF};}
 var BASE=JSON.stringify(stato());
-function apply(o){setTimeout(function(){LASTJ=JSON.stringify(stato());},0);CANT=o.CANT;PERS=o.PERS;TODO=o.TODO;AVV=o.AVV||{};REQ=o.REQ||null;REQQ=o.REQQ||[];RISP=o.RISP||{};MSGS=o.MSGS||[];NOTIF=o.NOTIF||{};if(o.accessi)ACC=o.accessi;}
-function api(m,b){return fetch('/api/stato?k='+encodeURIComponent(TOK)+(m==='GET'?'&since='+VER:''),{method:m,headers:{'content-type':'application/json'},body:b?JSON.stringify(b):undefined}).then(function(r){return r.json().then(function(j){j._s=r.status;return j;});});}
-var SVT=null;
-var LASTJ='';
+function apply(o){CANT=o.CANT;PERS=o.PERS;TODO=o.TODO;AVV=o.AVV||{};REQ=o.REQ||null;REQQ=o.REQQ||[];RISP=o.RISP||{};MSGS=o.MSGS||[];NOTIF=o.NOTIF||{};setTimeout(function(){LASTJ=JSON.stringify(stato());},0);}
+function api(m,path,b){return fetch(path,{method:m,headers:{'content-type':'application/json','x-disp':ME?ME.id+':'+ME.k:''},body:b?JSON.stringify(b):undefined}).then(function(r){return r.json().then(function(j){j._s=r.status;return j;});});}
+var SVT=null,LASTJ='';
 function save(){if(JSON.stringify(stato())===LASTJ)return;DIRTY=true;clearTimeout(SVT);SVT=setTimeout(saveNow,300);}
 function saveNow(){if(BUSYS){SVT=setTimeout(saveNow,300);return;}BUSYS=true;var body={ver:VER,data:stato()},sent=JSON.stringify(body.data);
- api('PUT',body).then(function(j){BUSYS=false;if(j._s===409){DIRTY=false;apply(j.data);VER=j.ver;toast('Qualcun altro ha appena cambiato qualcosa: ho aggiornato. Rifai l\'ultima cosa.');paint();return;}if(j.ver){VER=j.ver;LASTJ=sent;DIRTY=JSON.stringify(stato())!==sent;if(DIRTY)save();ERRS='';}else{ERRS=j.error||'Salvataggio non riuscito';toast(ERRS);}})
+ api('PUT','/api/stato',body).then(function(j){BUSYS=false;if(j._s===409){DIRTY=false;VER=j.ver;apply(j.data);toast('Qualcun altro ha appena cambiato qualcosa: ho aggiornato. Rifai l\'ultima cosa.');paint();return;}if(j._s===401||j._s===403){esci();return;}if(j.ver){VER=j.ver;LASTJ=sent;DIRTY=JSON.stringify(stato())!==sent;if(DIRTY)save();ERRS='';}else{ERRS=j.errore||'Salvataggio non riuscito';toast(ERRS);}})
  .catch(function(){BUSYS=false;ERRS='Niente rete: riprovo';SVT=setTimeout(saveNow,4000);});}
-function poll(){if(document.hidden||BUSYS||DIRTY||!TOK)return;api('GET').then(function(j){if(j.same||!j.data)return;VER=j.ver;apply(j.data);if(document.getElementById('mn').classList.contains('aperto'))return;var y=window.scrollY;paint();window.scrollTo(0,y);}).catch(function(){});}
-setInterval(poll,4000);document.addEventListener('visibilitychange',function(){if(!document.hidden)poll();});
+function poll(){if(document.hidden||BUSYS||DIRTY||!ME)return;
+ if(!ROLE){api('GET','/api/disp/stato').then(function(j){if(j._s===401){ME=null;meSave();paint();return;}ME.stato=j.stato;ME.codice=j.codice;if(j.stato==='ok')entra();else paint();}).catch(function(){});return;}
+ api('GET','/api/stato?since='+VER).then(function(j){if(j._s===401||j._s===403){esci();return;}var ch=false;if(j.disp&&JSON.stringify(j.disp)!==JSON.stringify(DISP)){DISP=j.disp;ch=true;}if(j.data){VER=j.ver;apply(j.data);ch=true;}if(!ch||document.getElementById('mn').classList.contains('aperto'))return;var y=window.scrollY;paint();window.scrollTo(0,y);}).catch(function(){});}
+setInterval(poll,3000);document.addEventListener('visibilitychange',function(){if(!document.hidden)poll();});
 function notif(n,t){(NOTIF[n]=NOTIF[n]||[]).push({t:t,ora:adesso()});}
 var _draw=draw;
 draw=function(){if(!REQ&&REQQ.length)REQ=REQQ.shift();if(ROLE)save();paint();};
 function paint(){
  document.body.classList.toggle('opv',!!ROLE&&ROLE.indexOf('op:')===0);
  var hd=document.getElementById('hdn');
- if(!ROLE){hd.innerHTML='Gestionale Cantieri <span>prova</span>';document.getElementById('nav').style.display='none';document.getElementById('bar').innerHTML='';document.getElementById('vista').innerHTML=startPage();return;}
- if(ROLE==='tit'){hd.innerHTML='Idraulica Bianchi <span>Titolare</span>';_draw();return;}
+ if(!ROLE){hd.innerHTML='Cantieri <span>Idraulica Bianchi</span>';document.getElementById('nav').style.display='none';document.getElementById('bar').innerHTML='';document.getElementById('vista').innerHTML=startPage();return;}
+ if(ROLE==='tit'){document.body.dir='ltr';hd.innerHTML='Idraulica Bianchi <span>Titolare</span>';_draw();return;}
  var n=ROLE.slice(3);hd.innerHTML=n+' <span>Operaio · Idraulica Bianchi</span>';opDraw(n);
 }
+/* --- prima schermata: chi sei? --- */
 var START='';
-function startPage(){return START;}
-function boot(){
- if(!TOK){START='<div class="big-t">Serve il tuo link</div><div class="sotto">Apri il link personale che ti ha mandato il titolare su WhatsApp.</div>';api('GET').then(function(j){if(j.vuoto){START='<div class="big-t">Primo avvio</div><div class="sotto">Il gestionale è vuoto. Tocca qui sotto: metto i dati di esempio e preparo il link del titolare e quelli degli operai.</div><span class="btn pieno grande" onclick="setup()">Prepara il gestionale di prova</span>';}paint();}).catch(function(){paint();});paint();return;}
- START='<div class="big-t">Un attimo…</div>';paint();
- api('GET').then(function(j){
-  if(j._s===403){START='<div class="big-t">Link non valido</div><div class="sotto">Chiedi al titolare il tuo link personale.</div>';try{localStorage.removeItem('cantieriK');}catch(e){}paint();return;}
-  if(j.vuoto){START='<div class="big-t">Il gestionale è vuoto</div>';paint();return;}
-  VER=j.ver;apply(j.data);ROLE=j.io.r==='tit'?'tit':'op:'+j.io.n;paint();
+function startPage(){
+ if(START)return START;
+ if(ME&&ME.stato==='attesa')return '<div class="wait"><div class="big-t">In attesa del titolare</div><div class="sotto">Questo telefono è nuovo: il titolare deve approvarlo.</div><div class="wait-n">'+ME.n+'</div><div class="mt">Codice da dire al titolare</div><div class="wait-c">'+ME.codice+'</div><div class="mt">Appena approvato, si apre da solo.</div></div><span class="btn grande" onclick="esci()">Ho sbagliato nome</span>';
+ if(ME&&(ME.stato==='rifiutato'||ME.stato==='tolto'))return '<div class="wait"><div class="big-t">'+(ME.stato==='tolto'?'Telefono tolto':'Non approvato')+'</div><div class="sotto">Il titolare non ha approvato questo telefono.</div></div><span class="btn pieno grande" onclick="esci()">Chiedi di nuovo</span>';
+ if(PICK==='tit')return '<div class="big-t">Codice del titolare</div><div class="sotto">4 cifre. Nella prova: 1234</div><div class="pin-d">'+'●●●●'.slice(0,PINTXT.length)+'<span>'+'○○○○'.slice(PINTXT.length)+'</span></div><div class="pad">'+[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(function(x){return x===''?'<span></span>':'<button onclick="pinTasto(\''+x+'\')">'+x+'</button>';}).join('')+'</div><span class="btn grande" onclick="PICK=null;PINTXT=\'\';paint()">Indietro</span>';
+ if(PICK==='op')return '<div class="big-t">Come ti chiami?</div><div class="sotto">Tocca il tuo nome</div>'+PERS.map(function(p){return '<button class="who" onclick="chiedi(\'op\',\''+q(p.n)+'\')">'+ico('persona','indaco')+'<span>'+p.n+'</span></button>';}).join('')+'<span class="btn grande" onclick="PICK=null;paint()">Indietro</span>';
+ return '<div class="big-t">Chi sei?</div>'+
+  '<button class="who big" onclick="PICK=\'op\';NOMI();">'+ico('persona','indaco')+'<span>Operaio</span></button>'+
+  '<button class="who big" onclick="PICK=\'tit\';PINTXT=\'\';paint()">'+ico('titolare','blu')+'<span>Titolare</span></button>'+
+  '<div class="sotto" style="margin-top:12px">Sul telefono conviene prima metterla sulla schermata Home (Condividi → Aggiungi alla schermata Home) e poi aprirla da lì.</div>';
+}
+/* i nomi degli operai li conosce solo il server: si chiedono quando servono */
+function NOMI(){fetch('/api/nomi').then(function(r){return r.json();}).then(function(j){if(j.nomi&&j.nomi.length)PERS=j.nomi.map(function(n){return pOf(n)||{n:n,cal:[[],[],[],[],[]],corsi:[]};});paint();}).catch(function(){paint();});paint();}
+function pinTasto(x){if(x==='⌫')PINTXT=PINTXT.slice(0,-1);else if(PINTXT.length<4)PINTXT+=x;paint();if(PINTXT.length===4)chiedi('tit','',PINTXT);}
+function chiedi(ruolo,n,pin){
+ api('POST','/api/disp/richiesta',{ruolo:ruolo,n:n,pin:pin,data:ruolo==='tit'?JSON.parse(BASE):undefined}).then(function(j){
+  PINTXT='';if(!j.id){toast(j.errore||'Non riuscito');paint();return;}
+  ME={id:j.id,k:j.k,stato:j.stato,codice:j.codice,n:n||'Titolare'};meSave();PICK=null;if(j.stato==='ok')entra();else paint();
+ }).catch(function(){toast('Niente rete');});
+}
+function entra(){
+ api('GET','/api/stato?all=1').then(function(j){
+  if(j._s===401){ME=null;meSave();paint();return;}if(j._s===403){if(ME){ME.stato=j.stato||ME.stato;meSave();}paint();return;}
+  if(j.vuoto){START='<div class="big-t">Il gestionale è vuoto</div><div class="sotto">Deve entrare prima il titolare.</div>';paint();return;}
+  VER=j.ver;apply(j.data);DISP=j.disp||[];ROLE=j.io.r==='tit'?'tit':'op:'+j.io.n;ME.stato='ok';meSave();START='';paint();
  }).catch(function(){START='<div class="big-t">Niente rete</div><div class="sotto">Riprova tra un attimo.</div>';paint();});
 }
-function setup(){fetch('/api/stato',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({data:JSON.parse(BASE),nomi:PERS.map(function(p){return p.n;})})}).then(function(r){return r.json();}).then(function(j){if(!j.tit){toast(j.error||'Non riuscito');return;}location.href='/?k='+j.tit;});}
-function linkOf(t){return location.origin+'/?k='+t;}
-function linkBlock(){
- if(!ACC)return '';var rows='';Object.keys(ACC).forEach(function(t){var a=ACC[t];var nome=a.r==='tit'?'Titolare (tu)':a.n,p=a.n&&pOf(a.n),msg='Ciao '+(a.n?first(a.n):'')+', questo è il tuo link per l\'app dei cantieri: '+linkOf(t)+' . Aprilo e tocca «Aggiungi alla schermata Home».';
-  rows+='<div class="td"><div class="td-x"><b>'+nome+'</b><span style="overflow-wrap:anywhere">'+linkOf(t)+'</span></div><div class="td-b">'+'<a class="btn pieno" target="_blank" href="https://wa.me/?text='+encodeURIComponent(msg)+'">WhatsApp</a>'+'<span class="btn" onclick="navigator.clipboard&&navigator.clipboard.writeText(\''+linkOf(t)+'\');toast(\'Link copiato\')">Copia</span></div></div>';});
- return sez('links','Link personali','Uno per persona: chi lo apre entra come quella persona','<div class="sotto">Non mandare il tuo link a nessuno: chi lo ha entra come titolare.</div>'+rows);
-}
-var _squadra=squadra;squadra=function(){return _squadra()+linkBlock();};PAGES.squadra=squadra;
+function esci(){ME=null;meSave();ROLE=null;PICK=null;START='';paint();}
+function boot(){if(ME&&ME.stato==='ok'){START='<div class="big-t">Un attimo…</div>';paint();entra();}else{paint();poll();}}
+/* --- titolare: telefoni da approvare e collegati --- */
+function dispAz(op,id){if(op==='togli'&&!confirm('Togli questo telefono? Per rientrare dovrà chiedere di nuovo.'))return;api('POST','/api/disp/azione',{op:op,id:id}).then(function(j){if(j.disp)DISP=j.disp;toast(op==='approva'?'Approvato: si apre da solo':(op==='rifiuta'?'Rifiutato':'Tolto'));paint();});}
+function dispReq(){var a=DISP.filter(function(d){return d.stato==='attesa';});if(!a.length)return '';
+ return a.map(function(d){return '<div class="req" style="border-color:var(--blu);background:#eef3f8"><div class="req-t" style="color:var(--blu)">Un telefono nuovo vuole entrare</div><div class="req-m"><b>'+d.n+'</b> · codice <b class="cod-in">'+d.codice+'</b></div><div class="mt">Controlla che il codice sia quello che vede sul suo telefono.</div><div class="barra-az" style="margin:8px 0 0"><span class="btn pieno" onclick="dispAz(\'approva\',\''+d.id+'\')">Approva</span><span class="btn rosso" onclick="dispAz(\'rifiuta\',\''+d.id+'\')">Rifiuta</span></div></div>';}).join('');}
+function dispBlock(){var ok=DISP.filter(function(d){return d.stato==='ok';});
+ return sez('disp','Telefoni collegati',ok.length+' telefoni','<div class="sotto">Chi apre l\'app su un telefono nuovo sceglie il suo nome; tu lo approvi da «Oggi».</div>'+ok.map(function(d){return '<div class="td"><div class="td-x"><b>'+d.n+'</b><span>'+(d.ruolo==='tit'?'Titolare':'Operaio')+(ME&&d.id===ME.id?' · questo dispositivo':'')+'</span></div>'+(ME&&d.id===ME.id?'':'<span class="btn rosso" onclick="dispAz(\'togli\',\''+d.id+'\')">Togli</span>')+'</div>';}).join('')+
+  '<div style="margin-top:10px"><span class="btn" onclick="pinCambia()">Cambia il codice del titolare</span></div>');}
+function pinCambia(){var p=prompt('Nuovo codice del titolare (4 cifre)');if(!p)return;if(!/^\d{4}$/.test(p)){toast('Servono 4 cifre');return;}api('POST','/api/disp/azione',{op:'pin',pin:p}).then(function(j){toast(j.ok?'Codice cambiato':(j.errore||'Non riuscito'));});}
+var _squadra=squadra;squadra=function(){return _squadra()+dispBlock();};PAGES.squadra=squadra;
 
 /* --- titolare: richieste, messaggi, avvisi agli operai --- */
 var _movOk=movOk;
 movOk=function(){var n=MV.n,to=MV.to,Q=QD[MV.quando],gg=MV.quando==='ora'?'adesso':(MV.fino?'da '+GIORNI[MV.g].split(' ')[0].toLowerCase()+' a venerdì':(MV.g===OGGI?'oggi':GIORNI[MV.g].toLowerCase())),c=cOf(to);
- notif(n,gg.charAt(0).toUpperCase()+gg.slice(1)+' vai a '+to+' · '+cAddr(c)+' · '+(MV.quando==='ora'?'dalle '+Q[1]:(MV.quando==='tutto'?c.ora:Q[0].toLowerCase()+' '+Q[1]+' – '+Q[2])));
+ notif(n,{k:'mv',q:MV.quando==='ora'?'ora':(MV.fino?'fino':(MV.g===OGGI?'oggi':'g')),g:MV.g,c:to,a:cAddr(c),o:MV.quando==='ora'?'@'+Q[1]:(MV.quando==='tutto'?c.ora:Q[1]+' – '+Q[2])});
  _movOk();if(RISP[n]&&RISP[n].indexOf('Vai a')===0){delete RISP[n];save();paint();}};
 function opAsk(n){var s=slotNow(pOf(n),OGGI),r={n:n,ora:adesso(),da:s?s.c:'',t:'Ho finito qui. Dove vado?'};if(REQ&&REQ.n!==n)REQQ.push(r);else REQ=r;delete RISP[n];toast('Mandato al titolare');draw();}
-function ferie(si){var p=pOf('Marco Neri');if(si){p.cal[3]=[{c:'Ferie'}];p.cal[4]=[{c:'Ferie'}];}notif('Marco Neri',si?'Ferie di giovedì 29 e venerdì 30 approvate':'Ferie di giovedì 29 e venerdì 30 non approvate');fatto('fer',si?'Approvate: Marco lo sa e il calendario è aggiornato':'Rifiutate: Marco riceve l\'avviso');}
+function ferie(si){var p=pOf('Marco Neri');if(si){p.cal[3]=[{c:'Ferie'}];p.cal[4]=[{c:'Ferie'}];}notif('Marco Neri',{k:si?'approved':'notapproved'});fatto('fer',si?'Approvate: Marco lo sa e il calendario è aggiornato':'Rifiutate: Marco riceve l\'avviso');}
 var MDEST='Tutti';
 function msgSheet(){
  var opts=['Tutti'].concat(CANT.filter(function(c){return !c.chiuso;}).map(function(c){return 'Squadra '+c.n;})).concat(PERS.map(function(p){return p.n;}));
@@ -688,10 +720,10 @@ function msgSend(){var t=document.getElementById('mtx').value.trim();if(!t){toas
  MSGS.unshift({id:Date.now(),a:MDEST,t:t,ora:adesso(),dest:dest,letti:{}});toast('Mandato');mnClose();draw();}
 function msgBlock(){if(!MSGS.length)return '';return '<div class="blk"><div class="blk-t">Messaggi mandati</div>'+MSGS.slice(0,4).map(function(m){var l=m.dest.filter(function(d){return m.letti[d];});return '<div class="td"><div class="td-x"><b>'+m.t+'</b><span style="display:block">A: '+m.a+' · alle '+m.ora+'</span><span style="display:block">'+m.dest.map(function(d){return (m.letti[d]?'✓ ':'○ ')+first(d)+(m.letti[d]?' '+m.letti[d]:'');}).join(' · ')+'</span></div><span class="st '+(l.length===m.dest.length?'ok':'a')+'">'+l.length+' su '+m.dest.length+'</span></div>';}).join('')+'</div>';}
 var _oggi=oggi;
-oggi=function(){var h=_oggi();var cut=h.indexOf('<span class="btn grande" onclick="nuovoMenu()">');return h.slice(0,cut)+msgBlock()+'<span class="btn grande" onclick="nuovoMenu()">＋ Nuovo</span>';};
+oggi=function(){var h=_oggi();var cut=h.indexOf('<span class="btn grande" onclick="nuovoMenu()">');h=h.slice(0,cut)+msgBlock()+'<span class="btn grande" onclick="nuovoMenu()">＋ Nuovo</span>';var k=h.indexOf('</div>')+6;k=h.indexOf('</div>',k)+6;return h.slice(0,k)+dispReq()+h.slice(k);};
 PAGES.oggi=oggi;
 var _dayMenu=dayMenu;
-dayMenu=function(n,g){_dayMenu(n,g);var f=document.getElementById('mnF');f.innerHTML=f.innerHTML.replace(/pOf\('([^']+)'\)\.cal\[(\d)\]=\[\{c:'Ferie'\}\];/g,"pOf('$1').cal[$2]=[{c:'Ferie'}];notif('$1','"+GIORNI[g]+": ferie');").replace(/pOf\('([^']+)'\)\.cal\[(\d)\]=\[\];/g,"pOf('$1').cal[$2]=[];notif('$1','"+GIORNI[g]+": resti libero');");};
+dayMenu=function(n,g){_dayMenu(n,g);var f=document.getElementById('mnF');f.innerHTML=f.innerHTML.replace(/pOf\('([^']+)'\)\.cal\[(\d)\]=\[\{c:'Ferie'\}\];/g,"pOf('$1').cal[$2]=[{c:'Ferie'}];notif('$1',{k:'dayHoliday',g:"+g+"});").replace(/pOf\('([^']+)'\)\.cal\[(\d)\]=\[\];/g,"pOf('$1').cal[$2]=[];notif('$1',{k:'dayFree',g:"+g+"});");};
 /* risposte del titolare: anche come avviso */
 var _reqAltro=reqAltro;
 /* --- app dell'operaio --- */
@@ -733,8 +765,82 @@ function opSend(n,cn){
  var w2=document.getElementById('w2').value.trim(),id='w'+Date.now();
  if(STIPO==='Rapportino'){var ore=document.getElementById('w1').value||'8',nt=document.getElementById('w3').value.trim();
   TODO.unshift({id:id,t:'Rapportino di '+first(n)+' · '+ore+' ore',s:(cn||'')+(w2?' · '+w2:'')+(nt?' · '+nt:''),b:[['Approva','fatto(\''+id+'\',\'Approvato\')'],['Rimanda','fatto(\''+id+'\',\'Rimandato a '+first(n)+'\')']]});}
- else{if(!w2){toast('Scrivi cosa succede');return;}TODO.unshift({id:id,t:STIPO+' · '+first(n),s:w2+(cn?' · '+cn:''),b:[['Risolto','fatto(\''+id+'\',\'Segnato come risolto\')']]});}
- toast('Mandato al titolare');OTAB='oggi';draw();
+ else{if(!w2){toast(T('writewhat'));return;}TODO.unshift({id:id,t:STIPO+' · '+first(n),s:w2+(cn?' · '+cn:''),b:[['Risolto','fatto(\''+id+'\',\'Segnato come risolto\')']]});}
+ toast(T('sent'));OTAB='oggi';draw();
+}
+
+/* ===== LINGUE DEGLI OPERAI: italiano dentro l'app, le altre si scaricano dal menu (public/lang/xx.json) ===== */
+var IT={"hi": "Ciao", "time": "sono le", "news": "Novità dal titolare", "okseen": "Ok, ho visto", "reply": "Il titolare ti ha risposto", "ok": "Ok", "notclocked": "Non hai ancora timbrato", "entered": "Entrato", "dayclosed": "Giornata chiusa", "clockin": "Timbra l'entrata", "clockout": "Timbra l'uscita", "goto": "Oggi vai a", "none": "Nessun cantiere: chiedi al titolare.", "map": "Apri la mappa", "asked": "Hai chiesto dove andare alle {0}. La risposta arriva qui.", "where": "Ho finito qui · dove vado?", "wholeday": "Tutto il giorno", "week": "La mia settimana", "free": "Libero", "holiday": "Ferie", "msgs": "Messaggi", "fromboss": "Dal titolare · alle", "read": "Ho letto", "readat": "Letto alle", "nomsgs": "Nessun messaggio.", "write": "Scrivi al titolare", "rap": "Rapportino", "prob": "Problema", "inc": "Quasi incidente", "site": "Cantiere", "hours": "Ore lavorate", "mat": "Materiali usati", "notes": "Note", "what": "Cosa succede", "send": "Manda", "sent": "Mandato al titolare", "writewhat": "Scrivi cosa succede", "tToday": "Oggi", "tWeek": "Settimana", "tMsgs": "Messaggi", "tWrite": "Scrivi", "who": "Chi sei?", "worker": "Operaio", "boss": "Titolare", "name": "Come ti chiami?", "tapname": "Tocca il tuo nome", "back": "Indietro", "wait": "In attesa del titolare", "wait2": "Questo telefono è nuovo: il titolare deve approvarlo.", "code": "Codice da dire al titolare", "opens": "Appena approvato, si apre da solo.", "wrongname": "Ho sbagliato nome", "refused": "Non approvato", "removed": "Telefono tolto", "refused2": "Il titolare non ha approvato questo telefono.", "askagain": "Chiedi di nuovo", "homehint": "Sul telefono conviene prima metterla sulla schermata Home (Condividi → Aggiungi alla schermata Home) e poi aprirla da lì.", "lang": "Lingua", "inAt": "Entrata alle", "outAt": "Uscita alle", "nowGo": "Adesso vai a", "todayGo": "Oggi vai a", "fromTo": "Da {0} a venerdì vai a", "dayGo": "{0}: vai a", "from": "dalle", "approved": "Le tue ferie di giovedì e venerdì sono approvate", "notapproved": "Le tue ferie di giovedì e venerdì non sono approvate", "dayHoliday": "{0}: ferie", "dayFree": "{0}: resti libero", "worker2": "Operaio", "pick": "Scegli la lingua", "_days": ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì"]};
+var LANGS=[['it','Italiano'],['en','English'],['ro','Română'],['sq','Shqip'],['ar','العربية'],['uk','Українська'],['fr','Français']];
+var LG='',LT=IT;
+(function(){try{LG=localStorage.getItem('cantieriLang')||'';if(LG&&LG!=='it'){var d=localStorage.getItem('cantieriLang_'+LG);if(d)LT=JSON.parse(d);else LG='';}}catch(e){}})();
+function T(k,a){var t=(LT&&LT[k])||IT[k]||k;return a!==undefined?t.replace('{0}',a):t;}
+function DAY(g){return ((LT&&LT._days)||IT._days)[g];}
+function hasLang(c){if(c==='it')return true;try{return !!localStorage.getItem('cantieriLang_'+c);}catch(e){return false;}}
+function setLang(c){
+ if(c==='it'){LG='it';LT=IT;try{localStorage.setItem('cantieriLang','it');}catch(e){}mnClose();paint();return;}
+ var have=null;try{have=localStorage.getItem('cantieriLang_'+c);}catch(e){}
+ if(have){LG=c;LT=JSON.parse(have);try{localStorage.setItem('cantieriLang',c);}catch(e){}mnClose();paint();return;}
+ toast('…');fetch('/lang/'+c+'.json').then(function(r){return r.json();}).then(function(j){LT=j;LG=c;try{localStorage.setItem('cantieriLang_'+c,JSON.stringify(j));localStorage.setItem('cantieriLang',c);}catch(e){}mnClose();paint();}).catch(function(){toast('Niente rete / No network');});
+}
+function langList(){return LANGS.map(function(x){return '<button class="who'+(x[0]===(LG||'it')?' on':'')+'" onclick="setLang(\''+x[0]+'\')"><span class="lg-c">'+x[0].toUpperCase()+'</span><span style="flex:1">'+x[1]+'</span><span class="lg-s">'+(hasLang(x[0])?'✓':'↓')+'</span></button>';}).join('');}
+function langMenu(){mnOpen(mnHead(T('pick'),'')+langList());}
+function langName(){var x=LANGS.find(function(l){return l[0]===(LG||'it');});return x?x[1]:'Italiano';}
+function nTxt(x){var o=x.t;if(typeof o==='string')return o;
+ if(o.k==='mv'){var pre=o.q==='ora'?T('nowGo'):(o.q==='oggi'?T('todayGo'):(o.q==='fino'?T('fromTo',DAY(o.g)):T('dayGo',DAY(o.g))));return pre+' <b>'+o.c+'</b><br>'+o.a+'<br>'+(o.o.charAt(0)==='@'?T('from')+' '+o.o.slice(1):o.o);}
+ if(o.k==='dayHoliday'||o.k==='dayFree')return T(o.k,DAY(o.g));
+ return T(o.k);}
+function sTxtL(s){return s.c==='Ferie'?T('holiday'):(s.da==='7:30'&&s.a==='17:00'?T('wholeday'):'<span dir="ltr">'+s.da+' – '+s.a+'</span>');}
+var OTABS=[['oggi','tToday','oggi'],['sett','tWeek','calendario'],['msg','tMsgs','bacheca'],['scrivi','tWrite','rapportino']];
+function opDraw(n){
+ var p=pOf(n);if(!p){document.getElementById('vista').innerHTML='<div class="big-t">?</div>';return;}
+ document.getElementById('nav').style.display='none';
+ document.body.dir=LG==='ar'?'rtl':'ltr';
+ document.getElementById('hdn').innerHTML=n+' <span>'+T('worker2')+' · Idraulica Bianchi · <a onclick="langMenu()">'+T('lang')+': '+langName()+'</a></span>';
+ var unread=MSGS.filter(function(m){return m.dest.indexOf(n)>-1&&!m.letti[n];}).length,nn=(NOTIF[n]||[]).length;
+ document.getElementById('vista').innerHTML={oggi:opOggi,sett:opSett,msg:opMsg,scrivi:opScrivi}[OTAB](n);
+ document.getElementById('bar').innerHTML=OTABS.map(function(t){var k=t[0]==='msg'?unread:(t[0]==='oggi'?nn+(RISP[n]?1:0):0);return '<button class="'+(OTAB===t[0]?'on':'')+'" onclick="OTAB=\''+t[0]+'\';paint();window.scrollTo(0,0)"><svg viewBox="0 0 24 24">'+I[t[2]]+'</svg><span>'+T(t[1])+'</span>'+(k?'<i>'+k+'</i>':'')+'</button>';}).join('');
+}
+function opOggi(n){
+ var p=pOf(n),a=p.cal[OGGI]||[],r=RISP[n],nt=NOTIF[n]||[],h='<div class="big-t">'+T('hi')+' '+first(n)+'</div><div class="sotto">'+DAY(0)+' 26/10 · '+T('time')+' '+adesso()+'</div>';
+ nt.forEach(function(x,i){h+='<div class="req" style="border-color:var(--blu);background:#eef3f8"><div class="req-t" style="color:var(--blu)">'+T('news')+' · '+x.ora+'</div><div class="req-m">'+nTxt(x)+'</div><span class="btn pieno" style="margin-top:8px" onclick="NOTIF[\''+q(n)+'\'].splice('+i+',1);draw()">'+T('okseen')+'</span></div>';});
+ if(r)h+='<div class="req" style="border-color:var(--verde);background:#eef6f0"><div class="req-t" style="color:var(--verde)">'+T('reply')+'</div><div class="req-m">'+r+'</div><span class="btn pieno" style="margin-top:8px" onclick="delete RISP[\''+q(n)+'\'];draw()">'+T('ok')+'</span></div>';
+ h+='<div class="ca" style="text-align:center">'+(p.e?'<div class="grande-ora">'+p.e+(p.u?' – '+p.u:'')+'</div><div class="mt">'+(p.u?T('dayclosed'):T('entered'))+'</div>':'<div class="grande-ora">--:--</div><div class="mt">'+T('notclocked')+'</div>')+
+  (p.u?'':'<div style="height:8px"></div><span class="btn pieno grande" onclick="opTimb(\''+q(n)+'\')">'+(p.e?T('clockout'):T('clockin'))+'</span>')+'</div>';
+ h+='<div class="blk-t" style="margin-top:6px">'+T('goto')+'</div>';
+ if(!a.length)h+='<div class="ca mt">'+T('none')+'</div>';
+ a.forEach(function(s){var c=cOf(s.c);if(!c){h+='<div class="ca"><div class="nm">'+sTxtL(s)+'</div></div>';return;}h+='<div class="ca"><div class="o" style="font-weight:600;color:var(--blu)">'+sTxtL(s)+'</div><div class="nm">'+c.n+'</div><div class="ad">'+PIN+'<span>'+cAddr(c)+'</span></div><a class="btn pieno" style="margin-top:8px;display:block;text-align:center" href="'+cMap(c)+'" target="_blank">'+T('map')+'</a></div>';});
+ var mine=REQ&&REQ.n===n?REQ:REQQ.find(function(x){return x.n===n;});
+ if(mine)h+='<div class="riquadro-avviso">'+T('asked',mine.ora)+'</div>';
+ else if(p.e&&!p.u)h+='<span class="btn grande" onclick="opAsk(\''+q(n)+'\')">'+T('where')+'</span>';
+ return h;
+}
+function opTimb(n){var p=pOf(n),o=adesso();if(!p.e){p.e=o;toast(T('inAt')+' '+o);}else{p.u=o;toast(T('outAt')+' '+o);}draw();}
+function opSett(n){var p=pOf(n);return '<div class="big-t">'+T('week')+'</div>'+p.cal.map(function(a,g){return '<div class="ca"><div class="mt" style="font-weight:600">'+DAY(g)+' '+GIORNI[g].split(' ')[1]+'</div>'+(a.length?a.map(function(s){var c=cOf(s.c);return c?'<div class="slot"><div class="nm" style="font-size:15px">'+c.n+'</div><div class="mt">'+sTxtL(s)+'</div><div class="ad">'+PIN+'<span>'+cAddr(c)+'</span></div></div>':'<div class="slot nm" style="font-size:15px;color:var(--ambra)">'+sTxtL(s)+'</div>';}).join(''):'<div class="mt">'+T('free')+'</div>')+'</div>';}).join('');}
+function opMsg(n){var m=MSGS.filter(function(x){return x.dest.indexOf(n)>-1;});return '<div class="big-t">'+T('msgs')+'</div>'+(m.length?m.map(function(x){return '<div class="ca"><div class="mt">'+T('fromboss')+' '+x.ora+'</div><div style="margin:6px 0">'+x.t+'</div>'+(x.letti[n]?'<span class="st ok">'+T('readat')+' '+x.letti[n]+'</span>':'<span class="btn pieno" onclick="MSGS.find(function(y){return y.id==='+x.id+'}).letti[\''+q(n)+'\']=adesso();draw()">'+T('read')+'</span>')+'</div>';}).join(''):'<div class="ca mt">'+T('nomsgs')+'</div>');}
+var STIPO='Rapportino',STK={Rapportino:'rap',Problema:'prob','Quasi incidente':'inc'};
+function opScrivi(n){
+ var s=slotNow(pOf(n),OGGI),cn=s&&cOf(s.c)?s.c:'';
+ return '<div class="big-t">'+T('write')+'</div><div class="selm">'+['Rapportino','Problema','Quasi incidente'].map(function(t){return '<button class="'+(STIPO===t?'on':'')+'" onclick="STIPO=\''+t+'\';paint()">'+T(STK[t])+'</button>';}).join('')+'</div><div class="ca">'+
+  (STIPO==='Rapportino'?'<label class="et">'+T('site')+'</label><div class="campo" style="background:#f8f9fb">'+(cn||'–')+'</div><label class="et">'+T('hours')+'</label><input class="campo" id="w1" type="number" value="8"><label class="et">'+T('mat')+'</label><textarea class="campo" id="w2" rows="2"></textarea><label class="et">'+T('notes')+'</label><textarea class="campo" id="w3" rows="2"></textarea>'
+   :'<label class="et">'+T('what')+'</label><textarea class="campo" id="w2" rows="3"></textarea>')+
+  '<span class="btn pieno grande" onclick="opSend(\''+q(n)+'\',\''+q(cn)+'\')">'+T('send')+'</span></div>';
+}
+var _opSend=opSend;
+/* prima schermata nella lingua scelta: la lingua si sceglie per prima */
+function startPage(){
+ document.body.dir=LG==='ar'?'rtl':'ltr';
+ if(START)return START;
+ if(!LG)return '<div class="big-t">Scegli la lingua · Choose your language</div>'+langList();
+ var lgRow='<div class="sotto" style="margin-top:12px">'+T('lang')+': <b>'+langName()+'</b> · <a style="text-decoration:underline;cursor:pointer" onclick="langMenu()">'+T('pick')+'</a></div>';
+ if(ME&&ME.stato==='attesa')return '<div class="wait"><div class="big-t">'+T('wait')+'</div><div class="sotto">'+T('wait2')+'</div><div class="wait-n">'+ME.n+'</div><div class="mt">'+T('code')+'</div><div class="wait-c">'+ME.codice+'</div><div class="mt">'+T('opens')+'</div></div><span class="btn grande" onclick="esci()">'+T('wrongname')+'</span>'+lgRow;
+ if(ME&&(ME.stato==='rifiutato'||ME.stato==='tolto'))return '<div class="wait"><div class="big-t">'+(ME.stato==='tolto'?T('removed'):T('refused'))+'</div><div class="sotto">'+T('refused2')+'</div></div><span class="btn pieno grande" onclick="esci()">'+T('askagain')+'</span>';
+ if(PICK==='tit')return '<div class="big-t">Codice del titolare</div><div class="sotto">4 cifre. Nella prova: 1234</div><div class="pin-d">'+'●●●●'.slice(0,PINTXT.length)+'<span>'+'○○○○'.slice(PINTXT.length)+'</span></div><div class="pad">'+[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(function(x){return x===''?'<span></span>':'<button onclick="pinTasto(\''+x+'\')">'+x+'</button>';}).join('')+'</div><span class="btn grande" onclick="PICK=null;PINTXT=\'\';paint()">'+T('back')+'</span>';
+ if(PICK==='op')return '<div class="big-t">'+T('name')+'</div><div class="sotto">'+T('tapname')+'</div>'+PERS.map(function(p){return '<button class="who" onclick="chiedi(\'op\',\''+q(p.n)+'\')">'+ico('persona','indaco')+'<span>'+p.n+'</span></button>';}).join('')+'<span class="btn grande" onclick="PICK=null;paint()">'+T('back')+'</span>';
+ return '<div class="big-t">'+T('who')+'</div>'+
+  '<button class="who big" onclick="PICK=\'op\';NOMI();">'+ico('persona','indaco')+'<span>'+T('worker')+'</span></button>'+
+  '<button class="who big" onclick="PICK=\'tit\';PINTXT=\'\';paint()">'+ico('titolare','blu')+'<span>'+T('boss')+'</span></button>'+
+  '<div class="sotto" style="margin-top:12px">'+T('homehint')+'</div>'+lgRow;
 }
 
 boot();

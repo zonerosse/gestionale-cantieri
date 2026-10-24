@@ -1,53 +1,94 @@
 // Gestionale Cantieri (prova) – Cloudflare Worker con file statici (cartella public) e un Durable Object con i dati.
-// Accesso con link personale ?k=<token>: i token stanno in data.accessi = {token:{r:'tit'}|{r:'op',n:'Nome'}}.
-// GET  /api/stato?k=&since=ver → {ver,data,io} (agli operai senza "accessi"); {same:true} se non è cambiato niente
-// PUT  /api/stato?k=  {ver,data} → {ver}; 409 con l'ultima versione se nel frattempo qualcuno ha salvato
-// POST /api/stato {data,nomi}   → solo a gestionale vuoto: crea i link (titolare + uno per persona) → {tit}
-// NB: è una PROVA con dati inventati. Nella versione vera il server deve filtrare cosa vede e cosa può cambiare ogni operaio.
+// Accessi come nel gestionale dei ristoranti («Dispositivi autorizzati»):
+//  - un solo indirizzo per tutti; ogni telefono/computer sceglie «Titolare» o «Operaio» (e il suo nome);
+//  - il Titolare entra con il suo codice di 4 cifre (prova: 1234); il primo ingresso prepara anche i dati di esempio;
+//  - un Operaio resta «In attesa del titolare» con un codice di 4 cifre: il titolare lo approva da «Oggi»;
+//  - ogni dispositivo approvato ha una chiave segreta (id:chiave nell'intestazione X-Disp) e rientra da solo.
+// API: POST /api/disp/richiesta {ruolo,n,pin,data?} · GET /api/disp/stato?id&k · POST /api/disp/azione {op,id} (titolare)
+//      GET/PUT /api/stato (con X-Disp) come prima: {ver,data,io,disp?} · 409 se qualcuno ha salvato nel frattempo
+// NB: è una PROVA. Nella versione vera il server deve filtrare cosa vede e cosa può cambiare ogni operaio.
 import { DurableObject } from "cloudflare:workers";
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json", "cache-control": "no-store" } });
-const tok = () => [...crypto.getRandomValues(new Uint8Array(18))].map(b => b.toString(16).padStart(2, "0")).join("");
+const rnd = n => [...crypto.getRandomValues(new Uint8Array(n))].map(b => b.toString(16).padStart(2, "0")).join("");
+const cod4 = () => String(1000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 9000));
 
 export class Stato extends DurableObject {
   async fetch(request) {
-    const url = new URL(request.url), k = url.searchParams.get("k") || "", st = this.ctx.storage;
-    const row = await st.get("main"); // {json, ver}
-    if (request.method === "POST") {
-      if (row) return J({ error: "Il gestionale è già pronto: usa il tuo link." }, 409);
-      let b; try { b = await request.json(); } catch (e) { return J({ error: "Dati non validi" }, 400); }
-      const data = b.data || {}, acc = {}, tit = tok();
-      acc[tit] = { r: "tit" };
-      (b.nomi || []).slice(0, 50).forEach(n => { acc[tok()] = { r: "op", n: String(n).slice(0, 80) }; });
-      data.accessi = acc;
-      await st.put("main", { json: JSON.stringify(data), ver: 1 });
-      return J({ tit });
+    const url = new URL(request.url), st = this.ctx.storage, p = url.pathname;
+    const disp = (await st.get("disp")) || {};
+    const pin = (await st.get("pin")) || "1234";
+    const now = Date.now();
+    const pub = () => Object.keys(disp).map(id => { const d = disp[id]; return { id, ruolo: d.ruolo, n: d.n, codice: d.codice, stato: d.stato, at: d.at, visto: d.visto }; });
+
+    if (p === "/api/disp/richiesta" && request.method === "POST") {
+      let b; try { b = await request.json(); } catch (e) { return J({ errore: "Dati non validi" }, 400); }
+      const ruolo = b.ruolo === "tit" ? "tit" : "op", n = String(b.n || "").slice(0, 80);
+      if (ruolo === "tit") {
+        const ip = request.headers.get("cf-connecting-ip") || "x", kk = "pinerr:" + ip, err = (await st.get(kk)) || { n: 0, t: now };
+        if (now - err.t > 900000) { err.n = 0; err.t = now; }
+        if (err.n >= 5) return J({ errore: "Troppi codici sbagliati: riprova tra 15 minuti" }, 429);
+        if (String(b.pin || "") !== pin) { err.n++; await st.put(kk, err); return J({ errore: "Codice sbagliato" }, 403); }
+        await st.delete(kk);
+        if (!(await st.get("main"))) await st.put("main", { json: JSON.stringify(b.data || {}), ver: 1 });
+      } else {
+        if (!(await st.get("main"))) return J({ errore: "Il titolare deve entrare per primo" }, 409);
+        if (!n) return J({ errore: "Scegli il tuo nome" }, 400);
+      }
+      const id = rnd(8), k = rnd(18);
+      disp[id] = { k, ruolo, n: ruolo === "tit" ? "Titolare" : n, codice: cod4(), stato: ruolo === "tit" ? "ok" : "attesa", at: now, visto: now };
+      await st.put("disp", disp);
+      return J({ id, k, stato: disp[id].stato, codice: disp[id].codice });
     }
-    if (!row) return J({ vuoto: true });
-    const data = JSON.parse(row.json), acc = data.accessi || {}, io = acc[k];
-    if (!io) return J({ error: "Link non valido" }, 403);
-    const vista = d => { if (io.r === "tit") return d; const c = Object.assign({}, d); delete c.accessi; return c; };
-    if (request.method === "GET") {
-      if (+url.searchParams.get("since") === row.ver) return J({ same: true, ver: row.ver });
-      return J({ ver: row.ver, data: vista(data), io });
+
+    if (p === "/api/nomi") { const row = await st.get("main"); let nomi = []; try { nomi = (JSON.parse(row.json).PERS || []).map(x => x.n); } catch (e) {} return J({ nomi }); }
+    // da qui serve un dispositivo riconosciuto
+    let id = url.searchParams.get("id") || "", k = url.searchParams.get("k") || "";
+    const h = request.headers.get("x-disp") || ""; if (h.includes(":")) [id, k] = h.split(":");
+    const me = disp[id];
+    if (!me || me.k !== k) return J({ errore: "dispositivo" }, 401);
+    if (now - (me.visto || 0) > 60000) { me.visto = now; await st.put("disp", disp); }
+
+    if (p === "/api/disp/stato") return J({ stato: me.stato, codice: me.codice, ruolo: me.ruolo, n: me.n });
+    if (me.stato !== "ok") return J({ errore: "non approvato", stato: me.stato }, 403);
+
+    if (p === "/api/disp/azione" && request.method === "POST") {
+      if (me.ruolo !== "tit") return J({ errore: "Solo il titolare" }, 403);
+      let b; try { b = await request.json(); } catch (e) { return J({ errore: "Dati non validi" }, 400); }
+      if (b.op === "pin") { if (!/^\d{4}$/.test(b.pin || "")) return J({ errore: "Servono 4 cifre" }, 400); await st.put("pin", b.pin); return J({ ok: true }); }
+      const d = disp[b.id]; if (!d) return J({ errore: "Dispositivo non trovato" }, 404);
+      if (b.id === id && b.op === "togli") return J({ errore: "Non puoi togliere te stesso" }, 400);
+      d.stato = b.op === "approva" ? "ok" : b.op === "rifiuta" ? "rifiutato" : b.op === "togli" ? "tolto" : d.stato;
+      await st.put("disp", disp);
+      return J({ ok: true, disp: pub() });
     }
-    if (request.method === "PUT") {
-      const txt = await request.text();
-      if (txt.length > 1800000) return J({ error: "Troppi dati" }, 413);
-      let b; try { b = JSON.parse(txt); } catch (e) { return J({ error: "Dati non validi" }, 400); }
-      if (b.ver !== row.ver) return J({ ver: row.ver, data: vista(data) }, 409);
-      const nd = b.data || {};
-      nd.accessi = acc; // i link li decide solo il server
-      await st.put("main", { json: JSON.stringify(nd), ver: row.ver + 1 });
-      return J({ ver: row.ver + 1 });
+
+    if (p === "/api/stato") {
+      const row = await st.get("main");
+      if (!row) return J({ vuoto: true });
+      const io = { r: me.ruolo, n: me.n, id };
+      const extra = me.ruolo === "tit" ? { disp: pub() } : {};
+      if (request.method === "GET") {
+        if (+url.searchParams.get("since") === row.ver && !url.searchParams.get("all")) return J(Object.assign({ same: true, ver: row.ver }, extra));
+        return J(Object.assign({ ver: row.ver, data: JSON.parse(row.json), io }, extra));
+      }
+      if (request.method === "PUT") {
+        const txt = await request.text();
+        if (txt.length > 1800000) return J({ errore: "Troppi dati" }, 413);
+        let b; try { b = JSON.parse(txt); } catch (e) { return J({ errore: "Dati non validi" }, 400); }
+        if (b.ver !== row.ver) return J({ ver: row.ver, data: JSON.parse(row.json) }, 409);
+        const nd = b.data || {}; delete nd.accessi;
+        await st.put("main", { json: JSON.stringify(nd), ver: row.ver + 1 });
+        return J({ ver: row.ver + 1 });
+      }
     }
-    return J({ error: "Metodo non permesso" }, 405);
+    return J({ errore: "Non trovato" }, 404);
   }
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname === "/api/stato") return env.STATO.get(env.STATO.idFromName("main")).fetch(request);
+    if (url.pathname.startsWith("/api/")) return env.STATO.get(env.STATO.idFromName("main")).fetch(request);
     return env.ASSETS.fetch(request);
   }
 };
