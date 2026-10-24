@@ -44,6 +44,22 @@ function migra(d) {
     ["Avvitatore DeWalt 18V", "Trapano a percussione Hilti", "Chiave a pappagallo", "Cercafughe", "Cassetta delle chiavi"]];
     P.forEach((p, i) => { S2.att[p.n] = (kit[i] || []).map((n, j) => ({ id: "a" + i + "_" + j, n, stato: i === 0 && j === 1 ? "rotto" : "ok" })); }); }
   for (const p of P) if (!S2.att[p.n]) S2.att[p.n] = [];
+  if (!S2.dpi) { S2.dpi = {}; const kit = [[["Scarpe antinfortunistiche", "43"], ["Casco", "", "15/03/2028"], ["Guanti da lavoro", "L"], ["Occhiali protettivi"], ["Imbracatura anticaduta", "", "15/01/2027"], ["Giubbotto ad alta visibilità", "XL"]],
+      [["Scarpe antinfortunistiche", "42"], ["Casco", "", "02/09/2027"], ["Guanti da lavoro", "M"], ["Cuffie o tappi antirumore"], ["Imbracatura anticaduta", "", "15/01/2027"]],
+      [["Scarpe antinfortunistiche", "44"], ["Casco", "", "10/01/2029"], ["Guanti da lavoro", "L"], ["Occhiali protettivi"], ["Mascherina FFP2/FFP3"]]];
+    P.forEach((p, i) => { const pc = 900 + i, it = (kit[i] || []).map((x, j) => ({ id: "d" + i + "_" + j, n: x[0], tg: x[1] || "", scad: x[2] || "", stato: "ok", pc }));
+      S2.dpi[p.n] = it; (S2.att[p.n] || []).forEach(x => { if (!x.pc) x.pc = pc; });
+      const elenco = (S2.att[p.n] || []).concat(it).filter(x => x.pc === pc).map(x => x.n + (x.tg ? " (taglia " + x.tg + ")" : "")).join(", ");
+      S.firmeP[p.n].unshift({ id: pc, pc: true, t: "Presa in carico di attrezzi e DPI", d: "Dichiaro di aver ricevuto, in buono stato, e di usare correttamente: " + elenco + ". Se qualcosa si rompe o manca lo segnalo subito dall'app.", fatto: i === 1 ? "01/09/2026 08:10" : "" }); }); }
+  for (const p of P) if (!S2.dpi[p.n]) S2.dpi[p.n] = [];
+  if (!S2.scad) S2.scad = [
+    { id: "s1", cat: "comm", t: "Appuntamento dal commercialista", chi: "", data: "05/11/2026", ora: "10:00", ripeti: "", nota: "Portare le fatture di ottobre" },
+    { id: "s2", cat: "tasse", t: "F24: ritenute e contributi dei dipendenti", chi: "", data: "16/11/2026", ora: "", ripeti: "mese", nota: "" },
+    { id: "s3", cat: "tasse", t: "Secondo acconto delle imposte", chi: "", data: "30/11/2026", ora: "", ripeti: "anno", nota: "" },
+    { id: "s4", cat: "tasse", t: "INAIL: autoliquidazione", chi: "", data: "16/02/2027", ora: "", ripeti: "anno", nota: "" },
+    { id: "s5", cat: "doc", t: "DURC da rinnovare", chi: "", data: "20/10/2026", ora: "", ripeti: "", nota: "Vale 120 giorni" },
+    { id: "s6", cat: "doc", t: "Patente a crediti: controllo dei punti sul portale", chi: "", data: "01/11/2026", ora: "", ripeti: "", nota: "+1 punto ogni due anni senza punti tolti" }];
+  if (!S2.patMov) S2.patMov = [];
   if (!S2.segn) { S2.segn = []; if (P[0]) S2.segn.push({ id: "w1761300000000", chi: P[0].n, k: "attrezzo", su: "Trapano a percussione Bosch", t: "Rotto", nota: "Non parte più la percussione", quando: "23/10 16:40", stato: "aperta" }); }
   return d;
 }
@@ -62,7 +78,7 @@ function vista(d, n) {
     S: { timbra: S.timbra, messaggi: [], presenze: (S.presenze || []).filter(mio), firmeOp: [], firmeSub: [], firmeP: { [n]: (S.firmeP || {})[n] || [] }, oreP: { [n]: (S.oreP || {})[n] || [] }, timbOp: { e: "", u: "" }, segnalazioni: [], rapportini: [], docSub: [] },
     S2: { giorni: S2.giorni, colori: S2.colori, posti: [], cal: {}, ferie: (S2.ferie || []).filter(f => f.chi === n), costi: [], pag: [], ordine: [], inc: [], foto: [], firmeCom: [], avanz: { perc: 0, fasi: [] },
       mat: (S2.mat || []).filter(m => m.p === furg), furg: furg ? { [n]: furg } : {}, assunto: { [n]: (S2.assunto || {})[n] || "" },
-      mezzi: furg && (S2.mezzi || {})[furg] ? { [furg]: S2.mezzi[furg] } : {}, att: { [n]: (S2.att || {})[n] || [] }, segn: (S2.segn || []).filter(x => x.chi === n) }
+      mezzi: furg && (S2.mezzi || {})[furg] ? { [furg]: S2.mezzi[furg] } : {}, att: { [n]: (S2.att || {})[n] || [] }, dpi: { [n]: (S2.dpi || {})[n] || [] }, segn: (S2.segn || []).filter(x => x.chi === n) }
   };
 }
 // quello che manda l'operaio n: si prende solo ciò che può cambiare lui, ripulito
@@ -95,7 +111,8 @@ function unisci(full, m, n) {
   d.TODO = nuovi.concat(d.TODO || []);
   // firme: solo i suoi documenti, solo la firma
   const fp = ((d.S || {}).firmeP || {})[n], fm = ((((m.S || {}).firmeP) || {})[n]) || [];
-  if (fp) fp.forEach(f => { const x = fm.find(y => y && y.id === f.id); if (!f.fatto && x && x.fatto) f.fatto = esc(x.fatto).slice(0, 20); });
+  if (fp) fp.forEach(f => { const x = fm.find(y => y && y.id === f.id); if (!f.fatto && x && x.fatto) { f.fatto = esc(x.fatto).slice(0, 20);
+    if (typeof x.img === "string" && x.img.length < 120000 && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(x.img)) f.img = x.img; } });
   // ferie e permessi: le sue richieste (lo stato lo decide il titolare)
   const S2 = d.S2 = d.S2 || {}, vec = (S2.ferie || []).filter(f => f.chi === n);
   const fe = ((m.S2 || {}).ferie || []).filter(f => f && f.chi === n).slice(0, 30).map(f => { const o = vec.find(v => v.id === f.id);
@@ -114,11 +131,13 @@ function unisci(full, m, n) {
   // attrezzi: può solo dire che uno è da cambiare, rotto o manca (lo rimette a posto il titolare)
   const at = (S2.att || {})[n] || [], atm = (((m.S2 || {}).att) || {})[n] || [];
   at.forEach(x => { const y = atm.find(z => z && z.id === x.id); if (y && ["cambiare", "rotto", "manca"].includes(y.stato)) x.stato = y.stato; });
+  const dp = (S2.dpi || {})[n] || [], dpm = (((m.S2 || {}).dpi) || {})[n] || [];
+  dp.forEach(x => { const y = dpm.find(z => z && z.id === x.id); if (y && ["cambiare", "rotto", "manca"].includes(y.stato)) x.stato = y.stato; });
   // segnalazioni nuove (furgone e attrezzi)
   S2.segn = S2.segn || []; const sid = new Set(S2.segn.map(x => x.id));
   for (const x of (((m.S2 || {}).segn) || []).slice(0, 20)) {
     if (!x || !/^w\d{6,16}$/.test(x.id || "") || sid.has(x.id) || x.chi !== n) continue;
-    S2.segn.unshift({ id: x.id, chi: n, k: x.k === "attrezzo" ? "attrezzo" : "furgone", su: esc(x.su).slice(0, 120), t: esc(x.t).slice(0, 60), nota: esc(x.nota).slice(0, 500), quando: esc(x.quando).slice(0, 20), stato: "aperta" });
+    S2.segn.unshift({ id: x.id, chi: n, k: ["attrezzo", "dpi"].includes(x.k) ? x.k : "furgone", su: esc(x.su).slice(0, 120), t: esc(x.t).slice(0, 60), nota: esc(x.nota).slice(0, 500), quando: esc(x.quando).slice(0, 20), stato: "aperta" });
   }
   S2.segn = S2.segn.slice(0, 300);
   return d;
