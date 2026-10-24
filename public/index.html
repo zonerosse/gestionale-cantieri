@@ -666,7 +666,7 @@ function setup(){fetch('/api/stato',{method:'POST',headers:{'content-type':'appl
 function linkOf(t){return location.origin+'/?k='+t;}
 function linkBlock(){
  if(!ACC)return '';var rows='';Object.keys(ACC).forEach(function(t){var a=ACC[t];var nome=a.r==='tit'?'Titolare (tu)':a.n,p=a.n&&pOf(a.n),msg='Ciao '+(a.n?first(a.n):'')+', questo è il tuo link per l\'app dei cantieri: '+linkOf(t)+' . Aprilo e tocca «Aggiungi alla schermata Home».';
-  rows+='<div class="td"><div class="td-x"><b>'+nome+'</b><span style="overflow-wrap:anywhere">'+linkOf(t)+'</span></div><div class="td-b">'+(p?'<a class="btn pieno" target="_blank" href="https://wa.me/39'+p.tel.replace(/\D/g,'')+'?text='+encodeURIComponent(msg)+'">WhatsApp</a>':'')+'<span class="btn" onclick="navigator.clipboard&&navigator.clipboard.writeText(\''+linkOf(t)+'\');toast(\'Link copiato\')">Copia</span></div></div>';});
+  rows+='<div class="td"><div class="td-x"><b>'+nome+'</b><span style="overflow-wrap:anywhere">'+linkOf(t)+'</span></div><div class="td-b">'+'<a class="btn pieno" target="_blank" href="https://wa.me/?text='+encodeURIComponent(msg)+'">WhatsApp</a>'+'<span class="btn" onclick="navigator.clipboard&&navigator.clipboard.writeText(\''+linkOf(t)+'\');toast(\'Link copiato\')">Copia</span></div></div>';});
  return sez('links','Link personali','Uno per persona: chi lo apre entra come quella persona','<div class="sotto">Non mandare il tuo link a nessuno: chi lo ha entra come titolare.</div>'+rows);
 }
 var _squadra=squadra;squadra=function(){return _squadra()+linkBlock();};PAGES.squadra=squadra;
