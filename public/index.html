@@ -1620,7 +1620,7 @@ var CORSI=[
  ['prep','Preposto (capo squadra)','12 ore','6 ore ogni 2 anni',2,'Artt. 19 e 37 D.Lgs. 81/2008 · Accordo 17/04/2025','Chi guida la squadra in cantiere. Va indicato per nome (dal 2021 è obbligatorio).',0],
  ['ps','Addetto al primo soccorso','16 ore (gruppo A) o 12 ore (gruppi B e C)','parte pratica ogni 3 anni',3,'Art. 45 D.Lgs. 81/2008 · DM 388/2003','In ogni cantiere ci deve essere qualcuno formato.',0],
  ['ai','Addetto antincendio ed emergenze','4, 8 o 16 ore (livello 1, 2 o 3)','2, 5 o 8 ore ogni 5 anni',5,'Art. 46 D.Lgs. 81/2008 · DM 2/9/2021','Il livello lo indica il DVR; nei cantieri di solito livello 2.',0],
- ['quota','Lavori in quota e DPI anticaduta','addestramento pratico','la legge non fissa ogni quanto: di solito ogni 5 anni',5,'Artt. 77 c.5 e 115 D.Lgs. 81/2008','Per imbracature e linee vita non basta consegnarle: serve l\'addestramento.',0],
+ ['quota','Lavori in quota e DPI anticaduta','addestramento pratico','la legge non fissa ogni quanto: di solito ogni 5 anni',5,'Artt. 77 c.5 e 115 D.Lgs. 81/2008','Per imbracature e linee vita non basta consegnarle: serve l\'addestramento. Tutte le regole nella sezione «Lavori in quota».',0],
  ['pon','Montaggio e smontaggio ponteggi','28 ore','4 ore ogni 4 anni',4,'Art. 136 e Allegato XXI D.Lgs. 81/2008','Solo per chi monta i ponteggi (serve anche il PiMUS).',0],
  ['ple','Piattaforme elevabili (PLE, cestelli)','8 o 10 ore','4 ore ogni 5 anni',5,'Art. 73 c.5 D.Lgs. 81/2008 · Accordo 17/04/2025','Per chi usa cestelli e piattaforme.',0],
  ['mmt','Escavatori e macchine movimento terra','da 10 a 16 ore','4 ore ogni 5 anni',5,'Art. 73 c.5 D.Lgs. 81/2008 · Accordo 17/04/2025','Anche miniescavatori e terne.',0],
@@ -1725,6 +1725,23 @@ OBB.push(['Per il tuo mestiere',[
  ['Strutture in acciaio: marcatura CE','Chi produce componenti strutturali in acciaio deve essere certificato secondo la EN 1090.','Reg. UE 305/2011 · norma EN 1090'],
  ['Serramenti: marcatura CE','Chi produce finestre e porte esterne le mette in commercio con marcatura CE e dichiarazione di prestazione.','Reg. UE 305/2011 · norma EN 14351-1'],
  ['Terre e rocce da scavo','Vanno gestite come sottoprodotto (con i documenti) o come rifiuto.','DPR 120/2017']]]);
+/* ===== LAVORI IN QUOTA (oltre 2 metri) ===== */
+CORSI.push(['funi','Lavori su funi (accesso e posizionamento)','32 ore (12 base + 20 specifico)','8 ore ogni 5 anni',5,'Art. 116 e Allegato XXI D.Lgs. 81/2008','Per chi lavora appeso alle corde (facciate, pozzi, tetti senza altri appoggi).',0]);
+CTAG.funi='edile tetti pitt cart';
+OBB.splice(3,0,['Lavori in quota (sopra i 2 metri)',[
+ ['Cosa vuol dire «in quota»','Ogni lavoro dove si può cadere da più di 2 metri rispetto a un piano stabile: tetti, ponteggi, scale, cestelli, solai aperti, scavi.','Art. 107 D.Lgs. 81/2008'],
+ ['Prima le protezioni per tutti, poi i DPI','Si sceglie prima un\'attrezzatura sicura (ponteggio, trabattello, PLE, parapetti, reti); imbracatura e cordino solo se queste non bastano.','Artt. 111 e 115 D.Lgs. 81/2008'],
+ ['Parapetti','Sui bordi da cui si può cadere: alti almeno 1 metro, con tavola fermapiede.','Art. 126 D.Lgs. 81/2008 · Allegato IV'],
+ ['Scale portatili','Solo per lavori brevi e a basso rischio; scale a norma (EN 131), appoggiate bene, che sporgano 1 metro oltre l\'appoggio.','Art. 113 D.Lgs. 81/2008'],
+ ['Trabattelli (ponti su ruote)','Montati come dice il libretto del costruttore, ruote bloccate, stabilizzatori aperti; non si spostano con persone sopra.','Art. 140 D.Lgs. 81/2008 · norma EN 1004'],
+ ['Ponteggi','Montati da personale formato (28 ore), con il PiMUS e il libretto; controllo prima dell\'uso e dopo maltempo.','Artt. 122–138 e Allegati XVIII–XXII D.Lgs. 81/2008'],
+ ['Cestelli e piattaforme (PLE)','Solo chi ha fatto il corso; dentro il cestello sempre con imbracatura agganciata; verifica periodica della macchina.','Art. 73 c.5 e Art. 71 c.11 D.Lgs. 81/2008'],
+ ['Imbracatura e cordino (DPI di 3ª categoria)','Consegna con firma, addestramento pratico obbligatorio, punto di aggancio sicuro.','Artt. 77 c.5 e 115 D.Lgs. 81/2008 · Reg. UE 2016/425'],
+ ['Controllo annuale dei DPI anticaduta','Imbracature, cordini e dispositivi vanno controllati almeno una volta all\'anno da una persona competente, e scritto sulla scheda (in questa app: data «da sostituire o revisionare» del DPI).','Art. 77 c.4 D.Lgs. 81/2008 · norma UNI EN 365'],
+ ['Linee vita e ancoraggi','Sui tetti si usano solo se verificati secondo il libretto (di solito ogni anno).','Art. 115 D.Lgs. 81/2008 · norma UNI EN 795'],
+ ['Tetti e coperture','Prima di salire si controlla che la copertura regga il peso; lucernari e lastre fragili vanno protetti.','Art. 148 D.Lgs. 81/2008'],
+ ['Soccorso di chi resta appeso','Chi resta sospeso all\'imbracatura va recuperato in pochi minuti (sindrome da sospensione): il piano di soccorso va scritto nel DVR o nel POS e provato.','Artt. 43 e 115 D.Lgs. 81/2008'],
+ ['Idoneità medica','Il medico competente dice se l\'operaio è idoneo al lavoro in quota.','Art. 41 D.Lgs. 81/2008']]]);
 var OTAG={'Cassa Edile e congruità':'edile cart pitt piast tetti scavi','PiMUS':'edile tetti cart pitt','Messa a terra dell\'impianto elettrico di cantiere':'edile scavi','Verifiche delle attrezzature':'edile elet clima cart pitt tetti serr scavi',
  'Abilitazione dell\'impresa':'idra elet clima','Dichiarazione di conformità':'idra elet clima','Libretto di impianto e rapporto di efficienza':'idra clima','Impresa F-gas':'idra clima',
  'Rischio chimico (vernici, solventi, colle, resine)':'pitt cart tetti edile piast','Polveri di silice (tagli di cemento, piastrelle, pietra)':'edile piast cart scavi','Lavori sui tetti':'tetti edile elet clima','Lavori elettrici':'elet clima','Strutture in acciaio: marcatura CE':'serr','Serramenti: marcatura CE':'serr','Terre e rocce da scavo':'scavi edile'};
