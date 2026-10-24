@@ -36,6 +36,15 @@ function migra(d) {
   for (const p of P) if (!S.oreP[p.n]) S.oreP[p.n] = [];
   if (!S2.furg) { S2.furg = {}; P.forEach((p, i) => { if (i < 2 && (S2.mat || [])[0]) S2.furg[p.n] = S2.mat[0].p; }); }
   if (!S2.assunto) { S2.assunto = {}; const a = ["01/03/2021", "15/06/2019", "10/01/2024"]; P.forEach((p, i) => { S2.assunto[p.n] = a[i] || ""; }); }
+  if (!S2.mezzi) { S2.mezzi = {}; (S2.mat || []).filter(m => /furgone/i.test(m.p)).forEach(m => { S2.mezzi[m.p] = { targa: "FE 482 KT", km: 84250, kmAt: "20/10/2026",
+    scad: [["Tagliando", "12/11/2026", "o a 90.000 km"], ["Gomme invernali", "15/11/2026", "da montare entro"], ["Assicurazione", "30/11/2026", ""], ["Bollo", "31/01/2027", ""], ["Revisione", "03/03/2027", ""]],
+    ctrl: { data: "19/10/2026", chi: (P[1] || P[0] || {}).n || "" } }; }); }
+  if (!S2.att) { S2.att = {}; const kit = [["Avvitatore Makita 18V", "Trapano a percussione Bosch", "Pressatrice per multistrato", "Smerigliatrice piccola", "Livella 120 cm", "Cassetta delle chiavi"],
+    ["Avvitatore Makita 18V", "Trapano a percussione Bosch", "Seghetto alleggeritore", "Livella 60 cm", "Cassetta delle chiavi"],
+    ["Avvitatore DeWalt 18V", "Trapano a percussione Hilti", "Chiave a pappagallo", "Cercafughe", "Cassetta delle chiavi"]];
+    P.forEach((p, i) => { S2.att[p.n] = (kit[i] || []).map((n, j) => ({ id: "a" + i + "_" + j, n, stato: i === 0 && j === 1 ? "rotto" : "ok" })); }); }
+  for (const p of P) if (!S2.att[p.n]) S2.att[p.n] = [];
+  if (!S2.segn) { S2.segn = []; if (P[0]) S2.segn.push({ id: "w1761300000000", chi: P[0].n, k: "attrezzo", su: "Trapano a percussione Bosch", t: "Rotto", nota: "Non parte più la percussione", quando: "23/10 16:40", stato: "aperta" }); }
   return d;
 }
 const MIEI_CANT = (d, n) => { const p = (d.PERS || []).find(x => x.n === n); const t = JSON.stringify(p ? p.cal || [] : []); return (d.CANT || []).filter(c => t.includes(c.n)); };
@@ -52,7 +61,8 @@ function vista(d, n) {
     NOTIF: d.NOTIF && d.NOTIF[n] ? { [n]: d.NOTIF[n] } : {},
     S: { timbra: S.timbra, messaggi: [], presenze: (S.presenze || []).filter(mio), firmeOp: [], firmeSub: [], firmeP: { [n]: (S.firmeP || {})[n] || [] }, oreP: { [n]: (S.oreP || {})[n] || [] }, timbOp: { e: "", u: "" }, segnalazioni: [], rapportini: [], docSub: [] },
     S2: { giorni: S2.giorni, colori: S2.colori, posti: [], cal: {}, ferie: (S2.ferie || []).filter(f => f.chi === n), costi: [], pag: [], ordine: [], inc: [], foto: [], firmeCom: [], avanz: { perc: 0, fasi: [] },
-      mat: (S2.mat || []).filter(m => m.p === furg), furg: furg ? { [n]: furg } : {}, assunto: { [n]: (S2.assunto || {})[n] || "" } }
+      mat: (S2.mat || []).filter(m => m.p === furg), furg: furg ? { [n]: furg } : {}, assunto: { [n]: (S2.assunto || {})[n] || "" },
+      mezzi: furg && (S2.mezzi || {})[furg] ? { [furg]: S2.mezzi[furg] } : {}, att: { [n]: (S2.att || {})[n] || [] }, segn: (S2.segn || []).filter(x => x.chi === n) }
   };
 }
 // quello che manda l'operaio n: si prende solo ciò che può cambiare lui, ripulito
@@ -94,6 +104,23 @@ function unisci(full, m, n) {
   // furgone: può solo segnare quello che usa (le quantità scendono)
   const fu = (S2.furg || {})[n], mv = (S2.mat || []).find(x => x.p === fu), mm = ((m.S2 || {}).mat || []).find(x => x && x.p === fu);
   if (mv && mm) mv.v.forEach((r, i) => { const q = mm.v && mm.v[i] && +mm.v[i][1]; if (Number.isFinite(q) && q >= 0 && q < r[1]) r[1] = q; });
+  // furgone: km (solo in su), controllo fatto
+  const mz = (S2.mezzi || {})[fu], mzm = (((m.S2 || {}).mezzi) || {})[fu];
+  if (mz && mzm) {
+    const km = Math.round(+mzm.km);
+    if (Number.isFinite(km) && km > (mz.km || 0) && km < (mz.km || 0) + 50000) { mz.km = km; mz.kmAt = esc(mzm.kmAt).slice(0, 10); }
+    if (mzm.ctrl && mzm.ctrl.chi === n && mzm.ctrl.data !== (mz.ctrl || {}).data) mz.ctrl = { data: esc(mzm.ctrl.data).slice(0, 10), chi: n };
+  }
+  // attrezzi: può solo dire che uno è da cambiare, rotto o manca (lo rimette a posto il titolare)
+  const at = (S2.att || {})[n] || [], atm = (((m.S2 || {}).att) || {})[n] || [];
+  at.forEach(x => { const y = atm.find(z => z && z.id === x.id); if (y && ["cambiare", "rotto", "manca"].includes(y.stato)) x.stato = y.stato; });
+  // segnalazioni nuove (furgone e attrezzi)
+  S2.segn = S2.segn || []; const sid = new Set(S2.segn.map(x => x.id));
+  for (const x of (((m.S2 || {}).segn) || []).slice(0, 20)) {
+    if (!x || !/^w\d{6,16}$/.test(x.id || "") || sid.has(x.id) || x.chi !== n) continue;
+    S2.segn.unshift({ id: x.id, chi: n, k: x.k === "attrezzo" ? "attrezzo" : "furgone", su: esc(x.su).slice(0, 120), t: esc(x.t).slice(0, 60), nota: esc(x.nota).slice(0, 500), quando: esc(x.quando).slice(0, 20), stato: "aperta" });
+  }
+  S2.segn = S2.segn.slice(0, 300);
   return d;
 }
 
