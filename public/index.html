@@ -1375,7 +1375,7 @@ var _cantieriAll=cantieri;cantieri=function(){var nInc=S2.inc.filter(function(x)
  return _cantieriAll()+'<div class="blk-t" style="margin-top:14px">Altro dei cantieri</div>'+oldTiles([['t-mat','materiali','oliva','Materiali e furgone',nMat?'avviso':''],['t-inc','incidente','rosso','Quasi incidenti',nInc?'avviso':''],['t-comm','committente','bronzo','Pagina dei clienti'],['t-timbra','qr','petrolio','Come si timbra']]);};
 PAGES.cant=cantieri;
 var _squadraAll=squadra;squadra=function(){var nM=(S2.segn||[]).filter(function(x){return x.stato==='aperta';}).length+Object.keys(S2.mezzi||{}).reduce(function(t,k){return t+(S2.mezzi[k].scad||[]).filter(function(x){return scStato(x[1])[0]!=='verde';}).length;},0);var nF=S2.ferie.filter(function(f){return f.stato==='attesa';}).length,nD=S.docSub.filter(function(d){return d.stato==='attesa';}).length;
- return _squadraAll()+'<div class="blk-t" style="margin-top:14px">Altro della squadra</div>'+oldTiles([['t-scad','calendario','ambra','Scadenze'],['patente','tessera','blu','Patente a crediti'],['t-ferie','ferie','ambra','Ferie e permessi',nF?'avviso':''],['t-docsub','doc','bronzo','Documenti dei subappaltatori',nD?'avviso':''],['t-pres','presenze','petrolio','Presenze e ore'],['t-mezzi','materiali','oliva','Furgoni, attrezzi e DPI'+(nM?' · '+nM:''),nM?'avviso':'']]);};
+ return _squadraAll()+'<div class="blk-t" style="margin-top:14px">Altro della squadra</div>'+oldTiles([['t-scad','calendario','ambra','Scadenze'],['t-obb','doc','indaco','Obblighi di legge'],['patente','tessera','blu','Patente a crediti'],['t-ferie','ferie','ambra','Ferie e permessi',nF?'avviso':''],['t-docsub','doc','bronzo','Documenti dei subappaltatori',nD?'avviso':''],['t-pres','presenze','petrolio','Presenze e ore'],['t-mezzi','materiali','oliva','Furgoni, attrezzi e DPI'+(nM?' · '+nM:''),nM?'avviso':'']]);};
 PAGES.squadra=squadra;
 /* ===== FURGONE (scadenze, cura, problemi) E ATTREZZI ===== */
 var SC_K={'Tagliando':'service','Revisione':'mot','Assicurazione':'insur','Bollo':'tax','Gomme invernali':'wtyres','Gomme estive':'styres'};
@@ -1612,6 +1612,102 @@ function tItAdd(k,p){mnOpen('<div class="titolo">'+(k==='dpi'?'Aggiungi DPI':'Ag
 function tItAddGo(k,p){var v=document.getElementById('atN').value.trim();if(!v)return;var x={id:'a'+Date.now(),n:v,stato:'ok'};if(k==='dpi'){x.tg=document.getElementById('atT').value.trim();var d=document.getElementById('atD').value;if(d)x.scad=gmaD(d);}LST(k,p).push(x);pcAdd(p,x);mnClose();toast('Aggiunto: '+first(p)+' deve firmare');vai('t-mezzi');}
 var _titMezzi=titMezzi;titMezzi=function(){var h=_titMezzi(),i=h.indexOf('<div class="blk-t" style="margin-top:12px">Attrezzi di ogni operaio</div>');if(i>-1)h=h.slice(0,i);return h+'<div class="blk-t" style="margin-top:12px">Attrezzi e DPI di ogni operaio</div>'+PERS.map(function(p){return tPersIt(p.n);}).join('');};
 OLD['t-mezzi']=[function(){return titMezzi();},'Furgoni, attrezzi e DPI'];OLD['o-att'][0]=function(){return opAtt();};
+/* ===== OBBLIGHI DI LEGGE: corsi della squadra e tutto ciò che serve per legge ===== */
+// [chiave, nome, durata, aggiornamento, anni (null = scadenza scritta sull'attestato), legge, spiegazione, obbligatorio per tutti]
+var CORSI=[
+ ['lav','Formazione dei lavoratori','4 ore generale + 12 ore specifica (edilizia = rischio alto)','6 ore ogni 5 anni',5,'Art. 37 D.Lgs. 81/2008 · Accordo Stato-Regioni 17/04/2025','Per ogni lavoratore, prima di cominciare a lavorare.',1],
+ ['med','Visita medica (sorveglianza sanitaria)','visita dal medico competente','di solito ogni anno: lo decide il medico',1,'Art. 41 D.Lgs. 81/2008','Prima di iniziare e poi periodica. Senza idoneità l\'operaio non può fare quella mansione.',1],
+ ['prep','Preposto (capo squadra)','12 ore','6 ore ogni 2 anni',2,'Artt. 19 e 37 D.Lgs. 81/2008 · Accordo 17/04/2025','Chi guida la squadra in cantiere. Va indicato per nome (dal 2021 è obbligatorio).',0],
+ ['ps','Addetto al primo soccorso','16 ore (gruppo A) o 12 ore (gruppi B e C)','parte pratica ogni 3 anni',3,'Art. 45 D.Lgs. 81/2008 · DM 388/2003','In ogni cantiere ci deve essere qualcuno formato.',0],
+ ['ai','Addetto antincendio ed emergenze','4, 8 o 16 ore (livello 1, 2 o 3)','2, 5 o 8 ore ogni 5 anni',5,'Art. 46 D.Lgs. 81/2008 · DM 2/9/2021','Il livello lo indica il DVR; nei cantieri di solito livello 2.',0],
+ ['quota','Lavori in quota e DPI anticaduta','addestramento pratico','la legge non fissa ogni quanto: di solito ogni 5 anni',5,'Artt. 77 c.5 e 115 D.Lgs. 81/2008','Per imbracature e linee vita non basta consegnarle: serve l\'addestramento.',0],
+ ['pon','Montaggio e smontaggio ponteggi','28 ore','4 ore ogni 4 anni',4,'Art. 136 e Allegato XXI D.Lgs. 81/2008','Solo per chi monta i ponteggi (serve anche il PiMUS).',0],
+ ['ple','Piattaforme elevabili (PLE, cestelli)','8 o 10 ore','4 ore ogni 5 anni',5,'Art. 73 c.5 D.Lgs. 81/2008 · Accordo 17/04/2025','Per chi usa cestelli e piattaforme.',0],
+ ['mmt','Escavatori e macchine movimento terra','da 10 a 16 ore','4 ore ogni 5 anni',5,'Art. 73 c.5 D.Lgs. 81/2008 · Accordo 17/04/2025','Anche miniescavatori e terne.',0],
+ ['conf','Ambienti confinati (pozzetti, vasche, cisterne)','4 + 8 ore','parte pratica 4 ore ogni 5 anni',5,'DPR 177/2011 · Accordo 17/04/2025','Servono anche 3 anni di esperienza documentata.',0],
+ ['pes','Lavori elettrici (PES, PAV, PEI)','circa 16 ore','la norma consiglia ogni 5 anni',5,'Art. 82 D.Lgs. 81/2008 · norma CEI 11-27','Per chi lavora vicino o su parti elettriche.',0],
+ ['strad','Segnaletica stradale (cantieri su strada)','8 ore (preposti 12)','3 ore ogni 4 anni',4,'Decreto interministeriale 22/01/2019','Per chi lavora con il traffico vicino.',0],
+ ['fgas','Patentino F-gas (condizionatori, pompe di calore)','esame presso un organismo certificato','scadenza scritta sul certificato',null,'DPR 146/2018 · Reg. UE 2024/573','Per installare o riparare impianti con gas refrigeranti. Serve anche l\'iscrizione al Registro F-gas.',0],
+ ['cald','Patentino conduzione caldaie (oltre 232 kW)','corso + esame all\'Ispettorato del lavoro','scadenza scritta sul patentino',null,'Art. 287 D.Lgs. 152/2006','Solo per condurre impianti termici grandi (condomini, centrali).',0],
+ ['amianto','Lavori con amianto','30 ore operatori (50 dirigenti)','lo stabilisce la Regione',null,'DPR 8/8/1994 · art. 258 D.Lgs. 81/2008','Solo se si toccano materiali con amianto.',0]];
+var CORSI_TIT=[
+ ['dl','Datore di lavoro (corso nuovo)','16 ore + 6 ore cantieri','6 ore ogni 5 anni',5,'Art. 37 c.7 D.Lgs. 81/2008 · Accordo 17/04/2025','Nuovo obbligo per il titolare: da fare entro 24 mesi dall\'accordo.',1],
+ ['dlrspp','Titolare che fa da RSPP','8 ore + 16 ore costruzioni','8 ore ogni 5 anni',5,'Art. 34 D.Lgs. 81/2008 · Accordo 17/04/2025','Se il responsabile della sicurezza sei tu e non un consulente esterno.',0],
+ ['ps','Addetto al primo soccorso','16 o 12 ore','parte pratica ogni 3 anni',3,'Art. 45 D.Lgs. 81/2008 · DM 388/2003','Se lo fai tu.',0],
+ ['ai','Addetto antincendio','4, 8 o 16 ore','2, 5 o 8 ore ogni 5 anni',5,'Art. 46 D.Lgs. 81/2008 · DM 2/9/2021','Se lo fai tu.',0],
+ ['fgas','Patentino F-gas','esame presso un organismo certificato','scadenza scritta sul certificato',null,'DPR 146/2018 · Reg. UE 2024/573','Se lavori sugli impianti con gas refrigeranti.',0]];
+var OBB=[
+ ['Chi va nominato',[
+  ['RSPP (responsabile della sicurezza)','Può essere il titolare (con il suo corso) o un consulente esterno.','Artt. 17, 31–34 D.Lgs. 81/2008'],
+  ['Medico competente','Fa le visite agli operai e decide ogni quanto ripeterle.','Artt. 18, 38–41 D.Lgs. 81/2008'],
+  ['RLS (rappresentante dei lavoratori)','Lo eleggono gli operai; se non c\'è, vale quello territoriale (RLST) della Cassa Edile o dell\'ente bilaterale.','Artt. 47–48 D.Lgs. 81/2008'],
+  ['Addetti al primo soccorso e all\'antincendio','Persone formate presenti in cantiere.','Artt. 18 c.1 b, 43–46 D.Lgs. 81/2008'],
+  ['Preposto','Il capo squadra, indicato per nome.','Art. 18 c.1 b-bis D.Lgs. 81/2008']]],
+ ['Documenti dell\'impresa',[
+  ['DVR (valutazione dei rischi)','Il documento con tutti i rischi e le misure. Va firmato con data certa e rifatto quando cambia qualcosa.','Artt. 17, 28, 29 D.Lgs. 81/2008'],
+  ['Patente a crediti','Serve per lavorare nei cantieri; almeno 15 punti.','Art. 27 D.Lgs. 81/2008 · DM 132/2024'],
+  ['DURC (regolarità contributiva)','Dimostra che i contributi sono pagati. Vale 120 giorni.','DM 30/01/2015'],
+  ['Libro unico del lavoro (LUL)','Presenze e paghe di ogni dipendente, di solito lo tiene il consulente del lavoro.','Art. 39 DL 112/2008'],
+  ['Cassa Edile e congruità','Se si applica il contratto edile: iscrizione e versamenti. Congruità della manodopera per lavori privati da 70.000 € e per tutti i lavori pubblici.','CCNL Edilizia · DM 143/2021'],
+  ['Consegna dei DPI con firma','Ogni DPI consegnato va registrato e firmato dall\'operaio (in questa app: Attrezzi e DPI).','Artt. 18 c.1 d, 77 D.Lgs. 81/2008 · Reg. UE 2016/425'],
+  ['Infortuni: comunicazione all\'INAIL','Entro 2 giorni per assenze di più di 3 giorni (il vecchio registro infortuni non c\'è più).','Art. 18 c.1 r D.Lgs. 81/2008 · D.Lgs. 151/2015'],
+  ['Documenti da dare al committente','Iscrizione alla Camera di Commercio, DVR, DURC, dichiarazione dell\'organico: è l\'idoneità tecnico-professionale.','Art. 90 c.9 e Allegato XVII D.Lgs. 81/2008']]],
+ ['In ogni cantiere',[
+  ['POS (piano operativo di sicurezza)','Uno per ogni cantiere, prima di entrare. I subappaltatori fanno il loro.','Artt. 89, 96 e Allegato XV D.Lgs. 81/2008'],
+  ['Tessera di riconoscimento','Foto, nome, datore di lavoro e data di assunzione, sempre addosso (in questa app: Tesserino).','Artt. 18 c.1 u, 20, 26 c.8 D.Lgs. 81/2008 · L. 136/2010 art. 5'],
+  ['PiMUS','Il piano di montaggio, se si monta un ponteggio.','Art. 134 e Allegato XXII D.Lgs. 81/2008'],
+  ['Notifica preliminare','La fa il committente (non tu) per i cantieri più grandi: va affissa in cantiere.','Art. 99 D.Lgs. 81/2008'],
+  ['Cassetta di primo soccorso','Sempre completa, con il contenuto previsto.','DM 388/2003']]],
+ ['Controlli periodici',[
+  ['Verifiche delle attrezzature','PLE, gru e altri apparecchi di sollevamento: verifiche periodiche (di solito ogni anno) da INAIL, ASL o enti abilitati.','Art. 71 c.11 e Allegato VII D.Lgs. 81/2008'],
+  ['Manutenzione e controlli delle attrezzature','Attrezzi tenuti in buono stato e controllati, con un registro.','Art. 71 c.4 e c.8–9 D.Lgs. 81/2008'],
+  ['Estintori','Controllo ogni 6 mesi da una ditta qualificata.','DM 1/9/2021 · norma UNI 9994-1'],
+  ['Messa a terra dell\'impianto elettrico di cantiere','Denuncia all\'avvio e verifica ogni 2 anni.','DPR 462/2001']]],
+ ['Per gli impianti (idraulico)',[
+  ['Abilitazione dell\'impresa','Per gli impianti di riscaldamento, idrico-sanitari e gas (lettere C, D, E) serve un responsabile tecnico con i requisiti.','DM 37/2008 artt. 1 e 4'],
+  ['Dichiarazione di conformità','A fine lavori, con i progetti o gli schemi e i materiali usati.','DM 37/2008 art. 7'],
+  ['Libretto di impianto e rapporto di efficienza','Per caldaie e impianti termici; in Emilia-Romagna si registrano nel catasto regionale CRITER.','DPR 74/2013'],
+  ['Impresa F-gas','Certificazione dell\'impresa e comunicazione degli interventi alla Banca dati F-gas.','DPR 146/2018 · Reg. UE 2024/573']]]];
+function FRM(n){S2.form=S2.form||{};return S2.form[n]=S2.form[n]||{};}
+function crsList(n){return n==='Titolare'?CORSI_TIT:CORSI;}
+function crsVal(n,c){
+ var k=c[0];
+ if(n!=='Titolare'&&(k==='lav'||k==='med')){var p=PERS.find(function(x){return x.n===n;}),re=k==='lav'?/formazione/i:/visita/i,e=p&&(p.corsi||[]).find(function(y){return re.test(y[0]);});var m=e&&/(\d{2}\/\d{2}\/\d{4})/.exec(e[1]);return m?{exp:m[1]}:{};}
+ return FRM(n)[k]||{};
+}
+function crsStato(n,c){var v=crsVal(n,c);if(v.na)return ['ardesia','Non serve'];if(!v.exp)return c[7]?['rosso','Manca']:['ardesia','Non segnato'];var st=scStato(v.exp);return st[0]==='verde'?['verde','Fino al '+v.exp]:[st[0],st[1]==='scaduto'?'Scaduto':'Scade '+st[1]];}
+function crsCard(n){var L=crsList(n),bad=L.filter(function(c){var s=crsStato(n,c);return s[0]==='rosso'||s[0]==='ambra';}).length;
+ return sez('cr-'+n,n==='Titolare'?'Tu (titolare)':n,bad?bad+' da sistemare':'In regola','<div class="lista">'+L.map(function(c){var s=crsStato(n,c);return riga('corso',s[0]==='ardesia'?'ardesia':s[0],c[1],s[1],'','crsMenu(\''+q(n)+'\',\''+c[0]+'\')');}).join('')+'</div>',bad?'a':'');}
+function crsMenu(n,k){var c=crsList(n).find(function(x){return x[0]===k;}),v=crsVal(n,c);
+ mnOpen('<div class="titolo">'+c[1]+'</div><div class="sotto">'+(n==='Titolare'?'Tu':n)+' · '+c[2]+' · aggiornamento: '+c[3]+'</div><div class="sotto" style="color:var(--text)">'+c[6]+'</div><div class="sotto">'+c[5]+'</div>'+
+ (c[4]?'<label class="et">'+(k==='med'?'Data dell\'ultima visita':'Data dell\'ultimo corso')+'</label><input class="campo" id="crF" type="date" value="'+isoD(v.fatto||'')+'"><div class="sotto">La scadenza si calcola da sola: '+c[4]+(c[4]===1?' anno':' anni')+' dopo.</div>':'')+
+ '<label class="et">'+(c[4]?'Oppure scrivi la scadenza':'Scade il')+'</label><input class="campo" id="crE" type="date" value="'+isoD(v.exp||'')+'">'+
+ '<div class="barra-az" style="margin-top:10px;justify-content:space-between"><span class="btn" onclick="crsNa(\''+q(n)+'\',\''+k+'\')">'+(v.na?'Serve':'Non serve per '+(n==='Titolare'?'me':first(n)))+'</span><span><span class="btn" onclick="mnClose()">Annulla</span> <span class="btn pieno" onclick="crsSave(\''+q(n)+'\',\''+k+'\')">Salva</span></span></div>');}
+function crsSave(n,k){var c=crsList(n).find(function(x){return x[0]===k;}),old=crsVal(n,c).exp||'',f=document.getElementById('crF'),e=document.getElementById('crE').value,fa=f&&f.value?gmaD(f.value):'',ex='';
+ if(e&&gmaD(e)!==old)ex=gmaD(e);
+ else if(fa&&c[4]){var p=fa.split('/'),d=new Date(+p[2]+c[4],+p[1]-1,+p[0]);ex=('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear();}
+ else if(e)ex=gmaD(e);
+ if(!ex){toast('Scrivi una data');return;}
+ if(n!=='Titolare'&&(k==='lav'||k==='med')){var pp=PERS.find(function(x){return x.n===n;}),re=k==='lav'?/formazione/i:/visita/i;pp.corsi=pp.corsi||[];var it=pp.corsi.find(function(y){return re.test(y[0]);}),a=(dP(ex)-oggiD())/864e5<=30?'a':'';if(it){it[1]=k==='lav'?'scade il '+ex:ex;it[2]=a;}else pp.corsi.push([k==='lav'?'Formazione lavoratori':'Visita medica',k==='lav'?'scade il '+ex:ex,a]);}
+ else FRM(n)[k]={fatto:fa,exp:ex};
+ mnClose();toast('Salvato · scade il '+ex);vai('t-obb');}
+function crsNa(n,k){var o=FRM(n);if(o[k]&&o[k].na)delete o[k];else o[k]={na:true};mnClose();vai('t-obb');}
+function titObb(){
+ var h='<div class="sotto">Riassunto per orientarsi: le scelte vanno fatte con il tuo RSPP o consulente. Tocca una voce per vedere cosa dice la legge.</div>';
+ h+='<div class="blk-t" style="margin-top:8px">Corsi e patentini della squadra</div><div class="sotto" style="margin-top:0">Segna la data dell\'ultimo corso: la scadenza va da sola nelle Scadenze.</div>';
+ h+=crsCard('Titolare')+PERS.map(function(p){return crsCard(p.n);}).join('');
+ h+='<div class="blk-t" style="margin-top:14px">Tutti i corsi: durata, aggiornamento e legge</div>'+sez('ob-corsi','Corsi e patentini',CORSI.length+' voci','<div class="lista">'+CORSI.map(function(c){return '<div class="riga"><div class="testo"><div class="n">'+c[1]+'</div><div class="d">'+c[2]+' · aggiornamento: '+c[3]+'<br>'+c[6]+'<br><b>'+c[5]+'</b></div></div></div>';}).join('')+'</div>');
+ h+='<div class="blk-t" style="margin-top:14px">Tutto il resto obbligatorio per legge</div>'+OBB.map(function(g,i){return sez('ob-'+i,g[0],g[1].length+' voci','<div class="lista">'+g[1].map(function(x){return '<div class="riga"><div class="testo"><div class="n">'+x[0]+'</div><div class="d">'+x[1]+'<br><b>'+x[2]+'</b></div></div></div>';}).join('')+'</div>');}).join('');
+ h+='<div class="sotto" style="margin-top:10px">Aggiornato a ottobre 2026 (corsi secondo l\'Accordo Stato-Regioni del 17/04/2025).</div>';
+ return h;
+}
+OLD['t-obb']=[titObb,'Obblighi di legge'];
+var _scItemsO=scItems;scItems=function(){var a=_scItemsO();Object.keys(S2.form||{}).forEach(function(n){var L=crsList(n);Object.keys(S2.form[n]).forEach(function(k){var v=S2.form[n][k],c=L.find(function(x){return x[0]===k;});if(c&&v&&v.exp&&!v.na)a.push({k:'f'+n+'|'+k,cat:k==='med'?'visita':'corso',t:c[1]+' · '+(n==='Titolare'?'tu':n),data:v.exp,nota:'aggiornamento: '+c[3]});});});return a.sort(function(a,b){return dP(a.data)-dP(b.data);});};
+var _scMenuO=scMenu;scMenu=function(k){if(k[0]!=='f')return _scMenuO(k);var z=k.slice(1).split('|');crsMenu(z[0],z[1]);};
+/* operaio: anche i suoi corsi e patentini */
+var _opScadO=opScadenze;opScadenze=function(){var f=(S2.form||{})[OP]||{},r=CORSI.filter(function(c){return c[0]!=='lav'&&c[0]!=='med'&&f[c[0]]&&f[c[0]].exp;});
+ return _opScadO()+(r.length?'<div class="card" style="margin-top:10px"><div class="lista">'+r.map(function(c){var s=crsStato(OP,c);return riga('corso',s[0]==='ardesia'?'ardesia':s[0],c[1],s[1],'');}).join('')+'</div></div>':'');};
+OLD['o-scadenze'][0]=function(){return opScadenze();};
 /* operaio: le altre cose in fondo a «Oggi» */
 var OLDL={'o-att':'toolsDpi','o-firme':'sign','o-scadenze':'courses','o-tessera':'card','o-mat':'van','o-ore':'myhours','o-ferie':'leave'};
 var _opDrawAll=opDraw;

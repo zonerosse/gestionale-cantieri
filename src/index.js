@@ -60,6 +60,11 @@ function migra(d) {
     { id: "s5", cat: "doc", t: "DURC da rinnovare", chi: "", data: "20/10/2026", ora: "", ripeti: "", nota: "Vale 120 giorni" },
     { id: "s6", cat: "doc", t: "Patente a crediti: controllo dei punti sul portale", chi: "", data: "01/11/2026", ora: "", ripeti: "", nota: "+1 punto ogni due anni senza punti tolti" }];
   if (!S2.patMov) S2.patMov = [];
+  if (!S2.form) { S2.form = { Titolare: { dlrspp: { fatto: "12/03/2024", exp: "12/03/2029" }, ps: { fatto: "05/03/2024", exp: "05/03/2027" } } };
+    const ex = [{ prep: { fatto: "10/01/2024", exp: "10/01/2026" }, ps: { fatto: "05/03/2024", exp: "05/03/2027" }, quota: { fatto: "12/05/2022", exp: "12/05/2027" }, fgas: { fatto: "", exp: "20/06/2029" } },
+      { ai: { fatto: "14/02/2022", exp: "14/02/2027" }, quota: { fatto: "12/05/2022", exp: "12/05/2027" } },
+      { quota: { fatto: "03/03/2025", exp: "03/03/2030" } }];
+    P.forEach((p, i) => { S2.form[p.n] = ex[i] || {}; }); }
   if (!S2.segn) { S2.segn = []; if (P[0]) S2.segn.push({ id: "w1761300000000", chi: P[0].n, k: "attrezzo", su: "Trapano a percussione Bosch", t: "Rotto", nota: "Non parte più la percussione", quando: "23/10 16:40", stato: "aperta" }); }
   return d;
 }
@@ -78,7 +83,7 @@ function vista(d, n) {
     S: { timbra: S.timbra, messaggi: [], presenze: (S.presenze || []).filter(mio), firmeOp: [], firmeSub: [], firmeP: { [n]: (S.firmeP || {})[n] || [] }, oreP: { [n]: (S.oreP || {})[n] || [] }, timbOp: { e: "", u: "" }, segnalazioni: [], rapportini: [], docSub: [] },
     S2: { giorni: S2.giorni, colori: S2.colori, posti: [], cal: {}, ferie: (S2.ferie || []).filter(f => f.chi === n), costi: [], pag: [], ordine: [], inc: [], foto: [], firmeCom: [], avanz: { perc: 0, fasi: [] },
       mat: (S2.mat || []).filter(m => m.p === furg), furg: furg ? { [n]: furg } : {}, assunto: { [n]: (S2.assunto || {})[n] || "" },
-      mezzi: furg && (S2.mezzi || {})[furg] ? { [furg]: S2.mezzi[furg] } : {}, att: { [n]: (S2.att || {})[n] || [] }, dpi: { [n]: (S2.dpi || {})[n] || [] }, segn: (S2.segn || []).filter(x => x.chi === n) }
+      mezzi: furg && (S2.mezzi || {})[furg] ? { [furg]: S2.mezzi[furg] } : {}, att: { [n]: (S2.att || {})[n] || [] }, dpi: { [n]: (S2.dpi || {})[n] || [] }, form: { [n]: (S2.form || {})[n] || {} }, segn: (S2.segn || []).filter(x => x.chi === n) }
   };
 }
 // quello che manda l'operaio n: si prende solo ciò che può cambiare lui, ripulito
