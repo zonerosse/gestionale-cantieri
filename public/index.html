@@ -1663,7 +1663,7 @@ var OBB=[
   ['Manutenzione e controlli delle attrezzature','Attrezzi tenuti in buono stato e controllati, con un registro.','Art. 71 c.4 e c.8–9 D.Lgs. 81/2008'],
   ['Estintori','Controllo ogni 6 mesi da una ditta qualificata.','DM 1/9/2021 · norma UNI 9994-1'],
   ['Messa a terra dell\'impianto elettrico di cantiere','Denuncia all\'avvio e verifica ogni 2 anni.','DPR 462/2001']]],
- ['Per gli impianti (idraulico)',[
+ ['Per gli impianti',[
   ['Abilitazione dell\'impresa','Per gli impianti di riscaldamento, idrico-sanitari e gas (lettere C, D, E) serve un responsabile tecnico con i requisiti.','DM 37/2008 artt. 1 e 4'],
   ['Dichiarazione di conformità','A fine lavori, con i progetti o gli schemi e i materiali usati.','DM 37/2008 art. 7'],
   ['Libretto di impianto e rapporto di efficienza','Per caldaie e impianti termici; in Emilia-Romagna si registrano nel catasto regionale CRITER.','DPR 74/2013'],
@@ -1708,6 +1708,56 @@ var _scMenuO=scMenu;scMenu=function(k){if(k[0]!=='f')return _scMenuO(k);var z=k.
 var _opScadO=opScadenze;opScadenze=function(){var f=(S2.form||{})[OP]||{},r=CORSI.filter(function(c){return c[0]!=='lav'&&c[0]!=='med'&&f[c[0]]&&f[c[0]].exp;});
  return _opScadO()+(r.length?'<div class="card" style="margin-top:10px"><div class="lista">'+r.map(function(c){var s=crsStato(OP,c);return riga('corso',s[0]==='ardesia'?'ardesia':s[0],c[1],s[1],'');}).join('')+'</div></div>':'');};
 OLD['o-scadenze'][0]=function(){return opScadenze();};
+/* ===== TIPO DI IMPRESA: la lista degli obblighi segue il mestiere ===== */
+var TIPI=[['edile','Edilizia e muratura','costruzioni, ristrutturazioni'],['idra','Idraulica e termoidraulica','bagni, caldaie, gas'],['elet','Impianti elettrici','anche antenne, allarmi, fotovoltaico'],['clima','Climatizzazione e pompe di calore','condizionatori, frigoriferi'],['cart','Cartongesso, intonaci e finiture',''],['pitt','Pittura e decorazione',''],['piast','Pavimenti e rivestimenti','piastrelle, parquet'],['tetti','Coperture e impermeabilizzazioni','tetti, lattoneria, guaine'],['serr','Serramenti, fabbri e carpenteria','finestre, cancelli, strutture in ferro'],['scavi','Scavi, movimento terra e trasporti','escavatori, camion'],['altro','Altro','un altro mestiere dei cantieri']];
+// mestieri per ogni corso e per ogni voce degli obblighi ('*' = tutti)
+CORSI.push(['fer','Installatore di impianti a fonti rinnovabili (FER)','corso di qualifica','16 ore ogni 3 anni',3,'Art. 15 D.Lgs. 28/2011 · in Emilia-Romagna DGR 1228/2016','Per il responsabile tecnico che installa fotovoltaico, solare termico, pompe di calore o caldaie a biomassa.',0]);
+CORSI.push(['gru','Gru su autocarro e carrelli elevatori (muletti)','12 ore la gru, da 12 a 16 ore i carrelli','4 ore ogni 5 anni',5,'Art. 73 c.5 D.Lgs. 81/2008 · Accordo 17/04/2025','Per chi usa la gru del camion o il muletto.',0]);
+CORSI.push(['cqc','Patente C e CQC (autisti di camion)','patente C e carta di qualificazione','35 ore ogni 5 anni',5,'D.Lgs. 286/2005','Per chi guida per lavoro camion sopra le 3,5 tonnellate.',0]);
+CORSI_TIT.push(['fer','Installatore FER (responsabile tecnico)','corso di qualifica','16 ore ogni 3 anni',3,'Art. 15 D.Lgs. 28/2011 · in Emilia-Romagna DGR 1228/2016','Se installi fotovoltaico, solare termico, pompe di calore o biomassa.',0]);
+var CTAG={lav:'*',med:'*',prep:'*',ps:'*',ai:'*',quota:'*',dl:'*',dlrspp:'*',pon:'edile tetti cart pitt',ple:'edile elet clima cart pitt tetti serr',mmt:'edile scavi',conf:'idra scavi edile',pes:'elet clima',strad:'edile scavi elet',fgas:'clima idra',cald:'idra',amianto:'edile tetti',fer:'elet idra clima',gru:'edile serr scavi tetti',cqc:'scavi edile'};
+OBB[2][1].splice(1,0,['Rifiuti del cantiere','Per portarli via con i tuoi mezzi: iscrizione all\'Albo gestori ambientali (categoria 2-bis) e formulario di trasporto (FIR).','Artt. 193 e 212 c.8 D.Lgs. 152/2006']);
+OBB.push(['Per il tuo mestiere',[
+ ['Rischio chimico (vernici, solventi, colle, resine)','Tieni le schede di sicurezza dei prodotti e valuta il rischio nel DVR; DPI giusti (maschere, guanti).','Artt. 223–224 D.Lgs. 81/2008 · Reg. CE 1907/2006 (REACH) e 1272/2008 (CLP)'],
+ ['Polveri di silice (tagli di cemento, piastrelle, pietra)','Taglio ad acqua o con aspirazione, mascherine FFP3, valutazione nel DVR: la silice è cancerogena.','Titolo IX Capo II D.Lgs. 81/2008 · D.Lgs. 44/2020'],
+ ['Lavori sui tetti','Prima le protezioni collettive (parapetti, reti), poi i DPI anticaduta; prima di salire si controlla che la copertura regga.','Artt. 111, 115 e 148 D.Lgs. 81/2008'],
+ ['Lavori elettrici','Fuori tensione con le procedure della norma; sotto tensione solo persone PEI autorizzate.','Artt. 82–83 D.Lgs. 81/2008 · norma CEI 11-27'],
+ ['Strutture in acciaio: marcatura CE','Chi produce componenti strutturali in acciaio deve essere certificato secondo la EN 1090.','Reg. UE 305/2011 · norma EN 1090'],
+ ['Serramenti: marcatura CE','Chi produce finestre e porte esterne le mette in commercio con marcatura CE e dichiarazione di prestazione.','Reg. UE 305/2011 · norma EN 14351-1'],
+ ['Terre e rocce da scavo','Vanno gestite come sottoprodotto (con i documenti) o come rifiuto.','DPR 120/2017']]]);
+var OTAG={'Cassa Edile e congruità':'edile cart pitt piast tetti scavi','PiMUS':'edile tetti cart pitt','Messa a terra dell\'impianto elettrico di cantiere':'edile scavi','Verifiche delle attrezzature':'edile elet clima cart pitt tetti serr scavi',
+ 'Abilitazione dell\'impresa':'idra elet clima','Dichiarazione di conformità':'idra elet clima','Libretto di impianto e rapporto di efficienza':'idra clima','Impresa F-gas':'idra clima',
+ 'Rischio chimico (vernici, solventi, colle, resine)':'pitt cart tetti edile piast','Polveri di silice (tagli di cemento, piastrelle, pietra)':'edile piast cart scavi','Lavori sui tetti':'tetti edile elet clima','Lavori elettrici':'elet clima','Strutture in acciaio: marcatura CE':'serr','Serramenti: marcatura CE':'serr','Terre e rocce da scavo':'scavi edile'};
+// abilitazione: il testo cambia con il mestiere
+function abilTxt(){var t=AZT(),l=[];if(t.indexOf('elet')>-1)l.push('A (impianti elettrici) e B (antenne, impianti elettronici)');if(t.indexOf('idra')>-1)l.push('C (riscaldamento), D (idrico-sanitario) ed E (gas)');if(t.indexOf('clima')>-1&&t.indexOf('idra')<0)l.push('C (climatizzazione e refrigerazione)');return 'Serve un responsabile tecnico con i requisiti, per le lettere '+(l.join('; ')||'del tuo lavoro')+'. Senza, non puoi firmare la dichiarazione di conformità.';}
+function AZT(){return ((S2.azienda||{}).tipi)||[];}
+function tagOk(tags){if(OB_ALL||!tags||tags==='*')return true;var t=AZT();if(!t.length)return true;return tags.split(' ').some(function(x){return t.indexOf(x)>-1;});}
+var OB_ALL=false;
+var _crsListT=crsList;crsList=function(n){return _crsListT(n).filter(function(c){var v=(n==='Titolare'?((S2.form||{}).Titolare||{}):((S2.form||{})[n]||{}))[c[0]];return tagOk(CTAG[c[0]]||'*')||(v&&v.exp);});};
+function azNomi(){return AZT().map(function(k){var x=TIPI.find(function(y){return y[0]===k;});return x?x[1]:k;}).join(' · ');}
+var _titObbT=titObb;titObb=function(){
+ var h='<div class="card" style="display:flex;align-items:center;gap:10px"><div style="flex:1;min-width:0"><div class="sotto" style="margin:0">Tipo di impresa</div><div style="font-weight:600">'+(azNomi()||'Non scelto')+'</div></div><span class="btn" onclick="AZSET=true;draw()">Cambia</span></div>';
+ var ob=OBB.map(function(g){return [g[0],g[1].filter(function(x){return tagOk(OTAG[x[0]]||'*');}).map(function(x){return x[0]==='Abilitazione dell\'impresa'?[x[0],abilTxt(),x[2]]:x;})];}).filter(function(g){return g[1].length;});
+ var keep=OBB;OBB=ob;var CK=CORSI;CORSI=CORSI.filter(function(c){return tagOk(CTAG[c[0]]||'*');});
+ var r=_titObbT();OBB=keep;CORSI=CK;
+ r=r.replace('Tocca una voce per vedere cosa dice la legge.','Tocca una voce per vedere cosa dice la legge. Qui trovi solo quello che serve per il tuo tipo di impresa.');
+ return h+r+'<span class="btn grande" style="margin-top:10px" onclick="OB_ALL=!OB_ALL;vai(\'t-obb\')">'+(OB_ALL?'Mostra solo il mio mestiere':'Mostra anche gli obblighi degli altri mestieri')+'</span>';
+};
+OLD['t-obb'][0]=function(){return titObb();};
+/* --- prima schermata del titolare: che tipo di impresa? --- */
+var AZSET=false,AZSEL=null;
+function azPage(){
+ if(!AZSEL)AZSEL=AZT().slice();
+ return '<div class="big-t">Che tipo di impresa sei?</div><div class="sotto">Tocca uno o più mestieri: il gestionale ti mostra i corsi, i patentini e gli obblighi di legge che servono a te. Puoi cambiarlo quando vuoi da Squadra → Obblighi di legge.</div>'+
+  '<div class="griglia" style="margin-top:8px">'+TIPI.map(function(t){var on=AZSEL.indexOf(t[0])>-1;return '<button class="tile'+(on?' avviso':'')+'" style="text-align:left;'+(on?'border-color:var(--blu);box-shadow:0 0 0 2px var(--blu) inset':'')+'" onclick="azTog(\''+t[0]+'\')">'+ico(on?'ok':'cantiere',on?'blu':'ardesia')+'<div class="t">'+t[1]+'</div>'+(t[2]?'<div class="sotto" style="margin:2px 0 0;font-size:12px">'+t[2]+'</div>':'')+'</button>';}).join('')+'</div>'+
+  '<span class="btn pieno grande" style="margin-top:14px" onclick="azOk()">Continua'+(AZSEL.length?' ('+AZSEL.length+')':'')+'</span>'+(AZT().length?'<span class="btn grande" style="margin-top:8px" onclick="AZSET=false;AZSEL=null;draw()">Annulla</span>':'');
+}
+function azTog(k){var i=AZSEL.indexOf(k);if(i>-1)AZSEL.splice(i,1);else AZSEL.push(k);paint();}
+function azOk(){if(!AZSEL.length){toast('Scegli almeno un mestiere');return;}S2.azienda=S2.azienda||{};S2.azienda.tipi=AZSEL.slice();var back=AZSET;AZSET=false;AZSEL=null;toast('Fatto: '+azNomi());if(back)vai('t-obb');else draw();}
+var _paintAz=paint;paint=function(){
+ if(ROLE==='tit'&&(AZSET||!AZT().length)){document.body.classList.remove('opv');document.getElementById('hdn').innerHTML='Gestionale Cantieri <span>Titolare</span>';document.getElementById('nav').style.display='none';document.getElementById('bar').innerHTML='';document.getElementById('vista').innerHTML=azPage();return;}
+ _paintAz();
+};
 /* operaio: le altre cose in fondo a «Oggi» */
 var OLDL={'o-att':'toolsDpi','o-firme':'sign','o-scadenze':'courses','o-tessera':'card','o-mat':'van','o-ore':'myhours','o-ferie':'leave'};
 var _opDrawAll=opDraw;

@@ -201,7 +201,7 @@ export class Stato extends DurableObject {
         const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
           headers: { "x-api-key": this.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
           body: JSON.stringify({ model: "claude-sonnet-5-5", max_tokens: 3000,
-            system: "Traduci messaggi di lavoro tra il titolare di una piccola impresa edile e i suoi operai. Traduci in " + LINGUE[a] + ", in modo semplice e diretto, come parlerebbe un collega in cantiere. Non tradurre nomi di persone, nomi dei cantieri, indirizzi, orari e numeri. Rispondi SOLO con un array JSON di stringhe, nello stesso ordine, senza altro testo.",
+            system: "Traduci messaggi di lavoro tra il titolare di una piccola impresa che lavora nei cantieri (edile, idraulica, elettrica o altro) e i suoi operai. Traduci in " + LINGUE[a] + ", in modo semplice e diretto, come parlerebbe un collega in cantiere. Non tradurre nomi di persone, nomi dei cantieri, indirizzi, orari e numeri. Rispondi SOLO con un array JSON di stringhe, nello stesso ordine, senza altro testo.",
             messages: [{ role: "user", content: JSON.stringify(manca.map(x => x[1])) }] }) });
         if (!r.ok) return J({ errore: "Traduzione non riuscita (" + r.status + ")", out });
         const j = await r.json(); let arr = [];
