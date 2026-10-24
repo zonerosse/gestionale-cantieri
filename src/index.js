@@ -10,6 +10,8 @@
 import { DurableObject } from "cloudflare:workers";
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const rnd = n => [...crypto.getRandomValues(new Uint8Array(n))].map(b => b.toString(16).padStart(2, "0")).join("");
+const LINGUE = { it: "italiano", en: "inglese", ro: "romeno", sq: "albanese", ar: "arabo", uk: "ucraino", fr: "francese" };
+const sha = async t => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)))].slice(0, 12).map(b => b.toString(16).padStart(2, "0")).join("");
 const cod4 = () => String(1000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 9000));
 
 export class Stato extends DurableObject {
@@ -18,7 +20,7 @@ export class Stato extends DurableObject {
     const disp = (await st.get("disp")) || {};
     const pin = (await st.get("pin")) || "1234";
     const now = Date.now();
-    const pub = () => Object.keys(disp).map(id => { const d = disp[id]; return { id, ruolo: d.ruolo, n: d.n, codice: d.codice, stato: d.stato, at: d.at, visto: d.visto }; });
+    const pub = () => Object.keys(disp).map(id => { const d = disp[id]; return { id, ruolo: d.ruolo, n: d.n, codice: d.codice, stato: d.stato, at: d.at, visto: d.visto, lang: d.lang || "it" }; });
 
     if (p === "/api/disp/richiesta" && request.method === "POST") {
       let b; try { b = await request.json(); } catch (e) { return J({ errore: "Dati non validi" }, 400); }
@@ -48,8 +50,32 @@ export class Stato extends DurableObject {
     if (!me || me.k !== k) return J({ errore: "dispositivo" }, 401);
     if (now - (me.visto || 0) > 60000) { me.visto = now; await st.put("disp", disp); }
 
+    const lg = (request.headers.get("x-lang") || "").slice(0, 5);
+    if (lg && me.lang !== lg) { me.lang = lg; await st.put("disp", disp); }
     if (p === "/api/disp/stato") return J({ stato: me.stato, codice: me.codice, ruolo: me.ruolo, n: me.n });
     if (me.stato !== "ok") return J({ errore: "non approvato", stato: me.stato }, 403);
+
+    // traduzione dei testi scritti a mano (messaggi del titolare, rapportini e segnalazioni degli operai), con Claude
+    if (p === "/api/traduci" && request.method === "POST") {
+      let b; try { b = await request.json(); } catch (e) { return J({ errore: "Dati non validi" }, 400); }
+      const a = String(b.a || ""), testi = (b.testi || []).slice(0, 20).map(t => String(t).slice(0, 2000));
+      if (!LINGUE[a]) return J({ errore: "Lingua non prevista" }, 400);
+      const out = [], manca = [];
+      for (const t of testi) { const h = "tr:" + a + ":" + await sha(t); const c = await st.get(h); out.push(c || null); if (!c) manca.push([out.length - 1, t, h]); }
+      if (manca.length) {
+        if (!this.env.ANTHROPIC_API_KEY) return J({ errore: "chiave", out });
+        const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
+          headers: { "x-api-key": this.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+          body: JSON.stringify({ model: "claude-sonnet-5-5", max_tokens: 3000,
+            system: "Traduci messaggi di lavoro tra il titolare di una piccola impresa edile e i suoi operai. Traduci in " + LINGUE[a] + ", in modo semplice e diretto, come parlerebbe un collega in cantiere. Non tradurre nomi di persone, nomi dei cantieri, indirizzi, orari e numeri. Rispondi SOLO con un array JSON di stringhe, nello stesso ordine, senza altro testo.",
+            messages: [{ role: "user", content: JSON.stringify(manca.map(x => x[1])) }] }) });
+        if (!r.ok) return J({ errore: "Traduzione non riuscita (" + r.status + ")", out });
+        const j = await r.json(); let arr = [];
+        try { const txt = (j.content || []).map(c => c.text || "").join(""); arr = JSON.parse(txt.slice(txt.indexOf("["), txt.lastIndexOf("]") + 1)); } catch (e) {}
+        for (let i = 0; i < manca.length; i++) if (typeof arr[i] === "string") { out[manca[i][0]] = arr[i]; await st.put(manca[i][2], arr[i]); }
+      }
+      return J({ out });
+    }
 
     if (p === "/api/disp/azione" && request.method === "POST") {
       if (me.ruolo !== "tit") return J({ errore: "Solo il titolare" }, 403);

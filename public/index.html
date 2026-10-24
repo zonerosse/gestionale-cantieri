@@ -246,6 +246,7 @@ body.opv header{background:var(--indaco)}
 .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:320px;margin:0 auto 14px}
 .pad button{font:inherit;font-size:26px;font-weight:600;padding:16px 0;border:1px solid var(--line);border-radius:12px;background:#fff;cursor:pointer;color:var(--text)}
 .who.on{border:2px solid var(--blu);background:#f4f7fa}.lg-c{font-size:12px;font-weight:700;color:var(--muted);width:30px}.lg-s{color:var(--verde);font-weight:700}
+.tr-or{font-size:12px;color:var(--muted);margin-top:4px;direction:ltr;text-align:left}
 </style>
 </head>
 <body>
@@ -642,7 +643,7 @@ function meSave(){try{if(ME)localStorage.setItem('cantieriDisp',JSON.stringify(M
 function stato(){return {CANT:CANT,PERS:PERS,TODO:TODO,AVV:AVV,REQ:REQ,REQQ:REQQ,RISP:RISP,MSGS:MSGS,NOTIF:NOTIF};}
 var BASE=JSON.stringify(stato());
 function apply(o){CANT=o.CANT;PERS=o.PERS;TODO=o.TODO;AVV=o.AVV||{};REQ=o.REQ||null;REQQ=o.REQQ||[];RISP=o.RISP||{};MSGS=o.MSGS||[];NOTIF=o.NOTIF||{};setTimeout(function(){LASTJ=JSON.stringify(stato());},0);}
-function api(m,path,b){return fetch(path,{method:m,headers:{'content-type':'application/json','x-disp':ME?ME.id+':'+ME.k:''},body:b?JSON.stringify(b):undefined}).then(function(r){return r.json().then(function(j){j._s=r.status;return j;});});}
+function api(m,path,b){return fetch(path,{method:m,headers:{'content-type':'application/json','x-disp':ME?ME.id+':'+ME.k:'','x-lang':(ROLE==='tit'?'it':(typeof LG!=='undefined'&&LG)||'it')},body:b?JSON.stringify(b):undefined}).then(function(r){return r.json().then(function(j){j._s=r.status;return j;});});}
 var SVT=null,LASTJ='';
 function save(){if(JSON.stringify(stato())===LASTJ)return;DIRTY=true;clearTimeout(SVT);SVT=setTimeout(saveNow,300);}
 function saveNow(){if(BUSYS){SVT=setTimeout(saveNow,300);return;}BUSYS=true;var body={ver:VER,data:stato()},sent=JSON.stringify(body.data);
@@ -698,7 +699,7 @@ function dispAz(op,id){if(op==='togli'&&!confirm('Togli questo telefono? Per rie
 function dispReq(){var a=DISP.filter(function(d){return d.stato==='attesa';});if(!a.length)return '';
  return a.map(function(d){return '<div class="req" style="border-color:var(--blu);background:#eef3f8"><div class="req-t" style="color:var(--blu)">Un telefono nuovo vuole entrare</div><div class="req-m"><b>'+d.n+'</b> · codice <b class="cod-in">'+d.codice+'</b></div><div class="mt">Controlla che il codice sia quello che vede sul suo telefono.</div><div class="barra-az" style="margin:8px 0 0"><span class="btn pieno" onclick="dispAz(\'approva\',\''+d.id+'\')">Approva</span><span class="btn rosso" onclick="dispAz(\'rifiuta\',\''+d.id+'\')">Rifiuta</span></div></div>';}).join('');}
 function dispBlock(){var ok=DISP.filter(function(d){return d.stato==='ok';});
- return sez('disp','Telefoni collegati',ok.length+' telefoni','<div class="sotto">Chi apre l\'app su un telefono nuovo sceglie il suo nome; tu lo approvi da «Oggi».</div>'+ok.map(function(d){return '<div class="td"><div class="td-x"><b>'+d.n+'</b><span>'+(d.ruolo==='tit'?'Titolare':'Operaio')+(ME&&d.id===ME.id?' · questo dispositivo':'')+'</span></div>'+(ME&&d.id===ME.id?'':'<span class="btn rosso" onclick="dispAz(\'togli\',\''+d.id+'\')">Togli</span>')+'</div>';}).join('')+
+ return sez('disp','Telefoni collegati',ok.length+' telefoni','<div class="sotto">Chi apre l\'app su un telefono nuovo sceglie il suo nome; tu lo approvi da «Oggi».</div>'+ok.map(function(d){return '<div class="td"><div class="td-x"><b>'+d.n+'</b><span>'+(d.ruolo==='tit'?'Titolare':'Operaio · legge in '+(LNOME[d.lang]||'italiano'))+(ME&&d.id===ME.id?' · questo dispositivo':'')+'</span></div>'+(ME&&d.id===ME.id?'':'<span class="btn rosso" onclick="dispAz(\'togli\',\''+d.id+'\')">Togli</span>')+'</div>';}).join('')+
   '<div style="margin-top:10px"><span class="btn" onclick="pinCambia()">Cambia il codice del titolare</span></div>');}
 function pinCambia(){var p=prompt('Nuovo codice del titolare (4 cifre)');if(!p)return;if(!/^\d{4}$/.test(p)){toast('Servono 4 cifre');return;}api('POST','/api/disp/azione',{op:'pin',pin:p}).then(function(j){toast(j.ok?'Codice cambiato':(j.errore||'Non riuscito'));});}
 var _squadra=squadra;squadra=function(){return _squadra()+dispBlock();};PAGES.squadra=squadra;
@@ -842,6 +843,31 @@ function startPage(){
   '<button class="who big" onclick="PICK=\'tit\';PINTXT=\'\';paint()">'+ico('titolare','blu')+'<span>'+T('boss')+'</span></button>'+
   '<div class="sotto" style="margin-top:12px">'+T('homehint')+'</div>'+lgRow;
 }
+
+/* ===== TRADUZIONE DEI TESTI SCRITTI A MANO (con Claude sul server, /api/traduci) ===== */
+var TRC={},TRQ={},TRT=null,TRERR='';
+try{TRC=JSON.parse(localStorage.getItem('cantieriTr')||'{}');}catch(e){}
+var LNOME={it:'italiano',en:'inglese',ro:'romeno',sq:'albanese',ar:'arabo',uk:'ucraino',fr:'francese'};
+function TR(t,l){if(!t||!l||l==='it')return null;var c=(TRC[l]||{})[t];if(c)return c;(TRQ[l]=TRQ[l]||{})[t]=1;clearTimeout(TRT);TRT=setTimeout(trFetch,200);return null;}
+function trFetch(){Object.keys(TRQ).forEach(function(l){var testi=Object.keys(TRQ[l]);delete TRQ[l];if(!testi.length)return;
+ api('POST','/api/traduci',{a:l,testi:testi}).then(function(j){var o=j.out||[],ch=false;testi.forEach(function(t,i){if(o[i]){(TRC[l]=TRC[l]||{})[t]=o[i];ch=true;}});if(j.errore)TRERR=j.errore;try{localStorage.setItem('cantieriTr',JSON.stringify(TRC));}catch(e){}if(ch&&!document.getElementById('mn').classList.contains('aperto'))paint();}).catch(function(){});});}
+function trBox(t){if(!LG||LG==='it')return t;var x=TR(t,LG);return x?x+'<div class="tr-or">IT · '+t+'</div>':t+(TRERR?'':'<div class="tr-or">…</div>');}
+/* messaggi e risposte del titolare: l'operaio li legge nella sua lingua */
+opMsg=function(n){var m=MSGS.filter(function(x){return x.dest.indexOf(n)>-1;});return '<div class="big-t">'+T('msgs')+'</div>'+(m.length?m.map(function(x){return '<div class="ca"><div class="mt">'+T('fromboss')+' '+x.ora+'</div><div style="margin:6px 0">'+trBox(x.t)+'</div>'+(x.letti[n]?'<span class="st ok">'+T('readat')+' '+x.letti[n]+'</span>':'<span class="btn pieno" onclick="MSGS.find(function(y){return y.id==='+x.id+'}).letti[\''+q(n)+'\']=adesso();draw()">'+T('read')+'</span>')+'</div>';}).join(''):'<div class="ca mt">'+T('nomsgs')+'</div>');};
+var _opOggi2=opOggi;
+opOggi=function(n){var r=RISP[n];if(r&&LG&&LG!=='it'){var x=TR(r,LG);RISP[n]=x?x:r;var h=_opOggi2(n);RISP[n]=r;return h;}return _opOggi2(n);};
+/* rapportini e segnalazioni scritti in un'altra lingua: arrivano al titolare già in italiano, con l'originale accanto */
+opSend=function(n,cn){
+ var w2=document.getElementById('w2').value.trim(),e3=document.getElementById('w3'),w3=e3?e3.value.trim():'',e1=document.getElementById('w1'),ore=e1?(e1.value||'8'):'',id='w'+Date.now(),tipo=STIPO,lg=LG||'it';
+ if(tipo!=='Rapportino'&&!w2){toast(T('writewhat'));return;}
+ var fine=function(a,b,tradotto){var orig=tradotto?(w2+(w3?' · '+w3:'')):'',nota=tradotto?' · tradotto dal '+LNOME[lg]+': «'+orig+'»':'';
+  if(tipo==='Rapportino')TODO.unshift({id:id,t:'Rapportino di '+first(n)+' · '+ore+' ore',s:(cn||'')+(a?' · '+a:'')+(b?' · '+b:'')+nota,b:[['Approva','fatto(\''+id+'\',\'Approvato\')'],['Rimanda','fatto(\''+id+'\',\'Rimandato a '+first(n)+'\')']]});
+  else TODO.unshift({id:id,t:tipo+' · '+first(n),s:a+(cn?' · '+cn:'')+nota,b:[['Risolto','fatto(\''+id+'\',\'Segnato come risolto\')']]});
+  toast(T('sent'));OTAB='oggi';draw();};
+ if(lg==='it'||!(w2||w3)){fine(w2,w3,false);return;}
+ toast('…');var tt=[w2,w3].filter(Boolean);
+ api('POST','/api/traduci',{a:'it',testi:tt}).then(function(j){var o=j.out||[];var a=w2?o[0]:'',b=w3?o[w2?1:0]:'';if((w2&&!a)||(w3&&!b)){fine(w2,w3,false);return;}fine(a,b,true);}).catch(function(){fine(w2,w3,false);});
+};
 
 boot();
 
