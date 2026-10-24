@@ -89,7 +89,7 @@ th,td{text-align:left;padding:7px 8px;border-top:1px solid var(--line)}
 th{color:var(--muted);font-weight:600;background:#f8f9fb}
 .num-c{text-align:right}
 /* firma */
-.velo{position:fixed;inset:0;background:rgba(20,30,40,.45);display:none;align-items:flex-end;justify-content:center;z-index:10}
+.velo{position:fixed;inset:0;background:rgba(20,30,40,.45);display:none;align-items:flex-end;justify-content:center;z-index:40}
 .velo.aperto{display:flex}
 .foglio{background:#fff;width:100%;max-width:560px;border-radius:12px 12px 0 0;padding:14px 16px 18px}
 @media (min-width:600px){.velo{align-items:center}.foglio{border-radius:12px}}
@@ -247,6 +247,19 @@ body.opv header{background:var(--indaco)}
 .pad button{font:inherit;font-size:26px;font-weight:600;padding:16px 0;border:1px solid var(--line);border-radius:12px;background:#fff;cursor:pointer;color:var(--text)}
 .who.on{border:2px solid var(--blu);background:#f4f7fa}.lg-c{font-size:12px;font-weight:700;color:var(--muted);width:30px}.lg-s{color:var(--verde);font-weight:700}
 .tr-or{font-size:12px;color:var(--muted);margin-top:4px;direction:ltr;text-align:left}
+.punti{display:flex;align-items:center;gap:14px}
+.num{font-size:40px;font-weight:700;line-height:1;color:var(--blu)}
+.num small{font-size:15px;color:var(--muted);font-weight:500}
+.barra{position:relative;height:12px;background:#e6eaee;border-radius:6px;margin:12px 0 4px;overflow:hidden}
+.barra i{position:absolute;left:0;top:0;bottom:0;background:var(--verde);border-radius:6px}
+.soglia{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--rosso)}
+.barra-leg{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+.stato-ok{font-size:13px;color:var(--verde);font-weight:600}
+.pt{font-weight:700;color:var(--blu);white-space:nowrap}
+.sino{display:flex;gap:6px}
+.sino button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:5px 10px;font:inherit;font-size:13px;cursor:pointer;color:var(--text)}
+.sino button.on{background:var(--blu);border-color:var(--blu);color:#fff}
+.totale{display:flex;justify-content:space-between;align-items:center;font-weight:600;background:#eef2f5;border-radius:8px;padding:10px 12px;margin-top:8px}
 </style>
 </head>
 <body>
@@ -258,6 +271,21 @@ body.opv header{background:var(--indaco)}
 </div>
 <div class="bar" id="bar"></div>
 <div class="mn" id="mn" onclick="if(event.target===this)mnClose()"><div class="foglio" id="mnF"></div></div>
+<div class="velo" id="velo">
+  <div class="foglio">
+    <div class="titolo" id="firmaTitolo">Firma</div>
+    <div class="sotto" id="firmaSotto"></div>
+    <label class="autodich"><input type="checkbox" id="firmaCheck"> <span id="firmaDich"></span></label>
+    <canvas id="tela"></canvas>
+    <div class="barra-az" style="margin-top:10px;justify-content:space-between">
+      <span class="btn" onclick="pulisci()">Cancella</span>
+      <span>
+        <span class="btn" onclick="chiudiFirma()">Annulla</span>
+        <span class="btn pieno" onclick="confermaFirma()">Firma</span>
+      </span>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 <script>
 var I={
@@ -288,6 +316,449 @@ var I={
  incidente:'<path d="M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z"/><path d="M12 9v4M12 16v.5"/>',
  tessera:'<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 17c.5-2 2-3 3.5-3s3 1 3.5 3M15 10h4M15 13h3"/>'
 };
+function ico(n,c){return '<div class="ico" style="background:var(--'+c+')"><svg viewBox="0 0 24 24">'+I[n]+'</svg></div>';}
+var FR='<svg class="freccia" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
+var SP='<span class="spunta"><svg viewBox="0 0 24 24">'+I.ok+'</svg></span>';
+function badge(c,t){return '<span class="badge" style="background:var(--'+c+')">'+t+'</span>';}
+function riga(ic,col,n,d,dx,click){return '<div class="riga'+(click?' click" onclick="'+click:'')+'">'+(ic?ico(ic,col):'')+'<div class="testo"><div class="n">'+n+'</div>'+(d?'<div class="d">'+d+'</div>':'')+'</div>'+(dx||'')+(click?FR:'')+'</div>';}
+function sezione(t,st,conta,html,aperta){return '<details class="'+(st==='r'?'allerta':st==='a'?'avviso':'')+'"'+(aperta?' open':'')+'><summary>'+t+'<span class="conta">'+conta+'</span>'+FR+'</summary><div class="dentro">'+html+'</div></details>';}
+function tile(id,ic,col,t,s,st){return '<button class="tile '+(st==='r'?'allerta':st==='a'?'avviso':'')+'" onclick="vai(\''+id+'\')">'+ico(ic,col)+'<div class="t">'+t+'</div><div class="s">'+s+'</div></button>';}
+function toast(t){var x=document.getElementById('toast');x.textContent=t;x.style.display='block';clearTimeout(x._t);x._t=setTimeout(function(){x.style.display='none';},2200);}
+function oraAdesso(){var d=new Date();return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);}
+
+/* ===== DATI DI ESEMPIO ===== */
+var S={
+ timbra:{qr:true,gps:false,autorizz:false},
+ messaggi:[
+  {id:1,a:'Squadra Bagno via Roma',da:'Titolare',quando:'Ieri 18:10',t:'Domani si parte alle 7:30. Portate la smerigliatrice grande, quella del furgone è in riparazione.',dest:['Luca Verdi','Marco Neri'],letti:{'Marco Neri':'Ieri 19:02'}},
+  {id:2,a:'Tutti',da:'Titolare',quando:'22/10 12:00',t:'Da lunedì nel cantiere di Comacchio si entra solo dal cancello di via Mare.',dest:['Luca Verdi','Marco Neri','Ahmed Benali','Cartongessi Delta'],letti:{'Luca Verdi':'22/10 12:40','Marco Neri':'22/10 13:05','Ahmed Benali':'22/10 18:21'}},
+  {id:3,a:'Cartongessi Delta',da:'Titolare',quando:'23/10 09:15',t:'La vostra patente risulta a 12 punti: sotto i 15 non potete entrare in cantiere. Aspetto notizie sul recupero dei crediti.',dest:['Cartongessi Delta'],letti:{}}
+ ],
+ presenze:[
+  {n:'Luca Verdi',c:'Bagno via Roma 12',e:'',u:'',modo:''},
+  {n:'Marco Neri',c:'Bagno via Roma 12',e:'07:24',u:'',modo:'QR'},
+  {n:'Ahmed Benali',c:'Caldaia Le Valli',e:'07:41',u:'',modo:'QR',ritardo:true}
+ ],
+ rapportini:[
+  {id:1,chi:'Marco Neri',c:'Bagno via Roma 12',data:'23/10',ore:8,mat:'Tubo multistrato 16 mm, 12 m · 6 raccordi',note:'Finito lo scarico della doccia.',foto:2,stato:'attesa'},
+  {id:2,chi:'Luca Verdi',c:'Bagno via Roma 12',data:'23/10',ore:8,mat:'Piatto doccia 80x120',note:'',foto:1,stato:'attesa'}
+ ],
+ docSub:[
+  {id:1,doc:'Patente a crediti',imp:'Cartongessi Delta',stato:'rifiutato',comm:'12 punti: sotto la soglia di 15.',file:true},
+  {id:2,doc:'DURC',imp:'Cartongessi Delta',stato:'approvato',comm:'Valido fino al 03/01/2027.',file:true},
+  {id:3,doc:'Attestato formazione · G. Rizzo',imp:'Cartongessi Delta',stato:'attesa',comm:'',file:true},
+  {id:4,doc:'Attestato formazione · P. Sala',imp:'Cartongessi Delta',stato:'scaduto',comm:'Scaduto il 10/10/2026: P. Sala non può entrare.',file:true},
+  {id:5,doc:'Patente a crediti',imp:'Elettrica Po srl',stato:'approvato',comm:'22 punti.',file:true}
+ ],
+ firmeOp:[
+  {id:1,t:'Consegna DPI: imbracatura',d:'Dichiaro di aver ricevuto l\'imbracatura anticaduta e le istruzioni d\'uso.',fatto:''},
+  {id:2,t:'Presa visione POS · Caldaia Le Valli',d:'Dichiaro di aver letto il Piano Operativo di Sicurezza del cantiere.',fatto:''},
+  {id:3,t:'Informativa sulla timbratura',d:'Dichiaro di aver ricevuto l\'informativa su come vengono registrate le presenze.',fatto:'03/03/2026'}
+ ],
+ firmeSub:[
+  {id:4,t:'Presa visione POS · Caldaia Le Valli',d:'Dichiaro di aver letto il Piano Operativo di Sicurezza del cantiere e di averlo fatto leggere ai miei operai.',fatto:''}
+ ],
+ timbOp:{e:'',u:''},
+ segnalazioni:[]
+};
+var OP='Luca Verdi', SUB='Cartongessi Delta', COM='Famiglia Rossi';
+S.messaggi.push({id:4,a:'Famiglia Rossi',da:'Titolare',quando:'23/10 17:30',t:'Lunedì arrivano le piastrelle: lasciate libero il corridoio, grazie.',dest:['Famiglia Rossi'],letti:{}});
+
+/* ===== DATI NUOVE SEZIONI ===== */
+var S2={
+ giorni:['Lun 26','Mar 27','Mer 28','Gio 29','Ven 30'],
+ posti:['Bagno via Roma 12','Caldaia Le Valli',''],
+ colori:{'Bagno via Roma 12':'petrolio','Caldaia Le Valli':'indaco','Ferie':'ambra','Permesso':'ambra'},
+ cal:{
+  'Luca Verdi':['Bagno via Roma 12','Bagno via Roma 12','Caldaia Le Valli','Caldaia Le Valli','Caldaia Le Valli'],
+  'Marco Neri':['Bagno via Roma 12','Bagno via Roma 12','Bagno via Roma 12','Bagno via Roma 12','Bagno via Roma 12'],
+  'Ahmed Benali':['Permesso','','Caldaia Le Valli','Caldaia Le Valli','Caldaia Le Valli']
+ },
+ ferie:[
+  {id:1,chi:'Marco Neri',tipo:'Ferie',dal:'Gio 29',al:'Ven 30',gi:[3,4],stato:'attesa',nota:'Matrimonio di mio cugino'},
+  {id:2,chi:'Ahmed Benali',tipo:'Permesso',dal:'Lun 26',al:'Lun 26',gi:[0],stato:'approvato',nota:'Visita in Comune'}
+ ],
+ costoOra:28,
+ costi:[
+  {c:'Bagno via Roma 12',comm:'Famiglia Rossi',prev:7500,ore:120,mat:2100,sub:0},
+  {c:'Caldaia Le Valli',comm:'Condominio Le Valli',prev:14200,ore:16,mat:1800,sub:1200}
+ ],
+ pag:[
+  {c:'Bagno via Roma 12',comm:'Famiglia Rossi',rate:[['Acconto alla firma',2250,'14/10/2026','pagato'],['A metà lavori',2250,'31/10/2026','attesa'],['A fine lavori',3000,'08/11/2026','futuro']]},
+  {c:'Caldaia Le Valli',comm:'Condominio Le Valli',rate:[['Acconto',4260,'20/10/2026','scaduto'],['Saldo',9940,'05/12/2026','futuro']]}
+ ],
+ mat:[
+  {p:'Furgone Ducato',v:[['Raccordi multistrato 16 mm',4,10,'pz'],['Tubo multistrato 16 mm',30,25,'m'],['Silicone sanitario',1,3,'pz'],['Teflon',6,4,'rotoli']]},
+  {p:'Magazzino',v:[['Piatto doccia 80x120',0,1,'pz'],['Valvole a sfera 1/2"',12,6,'pz']]}
+ ],
+ ordine:[],
+ inc:[{id:1,tipo:'Quasi incidente',data:'21/10/2026',c:'Bagno via Roma 12',chi:'Marco Neri',t:'La scala è scivolata sul pavimento bagnato, nessun ferito.',rimedio:'Messi i piedini antiscivolo nuovi alla scala.',stato:'chiuso'}],
+ avanz:{perc:55,fasi:[['Demolizione',1],['Impianto idraulico',1],['Massetto e piastrelle',0],['Sanitari e collaudo',0]]},
+ foto:[['18/10','Demolizione'],['20/10','Vecchi tubi tolti'],['21/10','Scarichi nuovi'],['22/10','Impianto acqua'],['23/10','Prova di tenuta'],['23/10','Piatto doccia']],
+ firmeCom:[
+  {id:7,t:'Variante: piatto doccia 80x120 invece di 70x90',d:'Accetto la variante con un costo in più di 180 euro, già aggiunto al saldo.',fatto:''},
+  {id:8,t:'Preventivo',d:'Preventivo del 02/10/2026 per il rifacimento del bagno.',fatto:'02/10/2026'}
+ ]
+};
+function euro(n){return n.toLocaleString('it-IT')+' €';}
+
+/* ===== A · CALENDARIO SQUADRE ===== */
+function chipCal(v,cliccabile,onclick){
+ if(!v)return '<span class="chip vuoto-c"'+(cliccabile?' onclick="'+onclick+'"':'')+'>Libero</span>';
+ var corto=v.replace('Bagno via Roma 12','Bagno via Roma').replace('Caldaia Le Valli','Caldaia Valli');
+ return '<span class="chip" style="background:var(--'+(S2.colori[v]||'ardesia')+')"'+(cliccabile?' onclick="'+onclick+'"':'')+'>'+corto+'</span>';
+}
+function titCal(){
+ var h='<div class="sotto">Settimana dal 26 al 30 ottobre · tocca una casella per cambiare cantiere: l\'operaio riceve l\'avviso.</div><div class="card" style="padding:6px;overflow-x:auto"><table class="cal"><tr><th class="nome"></th>'+S2.giorni.map(function(g){return '<th>'+g+'</th>';}).join('')+'</tr>';
+ Object.keys(S2.cal).forEach(function(n){
+  h+='<tr><td class="nome">'+n.split(' ')[0]+'</td>';
+  S2.cal[n].forEach(function(v,g){var fisso=v==='Ferie'||v==='Permesso';h+='<td>'+chipCal(v,!fisso,"cicla('"+n+"',"+g+")")+'</td>';});
+  h+='</tr>';
+ });
+ h+='</table></div><div class="leg"><span><span class="pallino" style="background:var(--petrolio)"></span>Bagno via Roma</span><span><span class="pallino" style="background:var(--indaco)"></span>Caldaia Le Valli</span><span><span class="pallino" style="background:var(--ambra)"></span>Ferie e permessi</span></div>';
+ return h;
+}
+function cicla(n,g){var p=S2.posti,i=p.indexOf(S2.cal[n][g]);S2.cal[n][g]=p[(i+1)%p.length];toast(n+' riceve l\'avviso del cambio');vai('t-cal');}
+function opCal(){
+ return '<div class="card"><div class="lista">'+S2.giorni.map(function(g,i){var v=S2.cal[OP][i];return riga('oggi',v?(S2.colori[v]||'ardesia'):'ardesia',g,v||'Nessun cantiere',v&&S2.colori[v]?'':'');}).join('')+'</div></div>';
+}
+
+/* ===== B · FERIE E PERMESSI ===== */
+function titFerie(){
+ var h='';
+ S2.ferie.slice().reverse().forEach(function(f){
+  var b=f.stato==='attesa'?'<div class="barra-az" style="margin:6px 0 0 44px"><span class="btn verde" onclick="esitoFerie('+f.id+',\'approvato\')">Approva</span><span class="btn rosso" onclick="esitoFerie('+f.id+',\'rifiutato\')">Rifiuta</span></div>':'';
+  h+='<div class="card" style="padding:4px 12px">'+riga('ferie',f.stato==='attesa'?'ambra':(f.stato==='approvato'?'verde':'rosso'),f.chi+' · '+f.tipo,f.dal+(f.al!==f.dal?' – '+f.al:'')+(f.nota?' · '+f.nota:''),badge(f.stato==='attesa'?'ambra':(f.stato==='approvato'?'verde':'rosso'),f.stato==='attesa'?'Da decidere':(f.stato==='approvato'?'Approvato':'Rifiutato')))+b+'</div>';
+ });
+ return h||'<div class="sotto">Nessuna richiesta.</div>';
+}
+function esitoFerie(id,e){S2.ferie.forEach(function(f){if(f.id===id){f.stato=e;if(e==='approvato')f.gi.forEach(function(g){S2.cal[f.chi][g]=f.tipo;});}});toast(e==='approvato'?'Approvato: il calendario è aggiornato':'Rifiutato: l\'operaio riceve l\'avviso');vai('t-ferie');}
+var tipoFerie='Ferie';
+function opFerie(){
+ var h='<div class="card"><label class="et">Cosa chiedi</label><div class="scelte"><button class="on" onclick="selTipo(this)">Ferie</button><button onclick="selTipo(this)">Permesso</button></div>'+
+  '<label class="et">Dal</label><input class="campo" id="fDal" type="date"><label class="et">Al</label><input class="campo" id="fAl" type="date">'+
+  '<label class="et">Nota (facoltativa)</label><input class="campo" id="fNota"><span class="btn pieno grande" onclick="chiediFerie()">Manda la richiesta</span></div>';
+ var mie=S2.ferie.filter(function(f){return f.chi===OP;});
+ if(mie.length)h+='<h2>Le mie richieste</h2><div class="card"><div class="lista">'+mie.map(function(f){return riga('ferie','ambra',f.tipo,f.dal+(f.al!==f.dal?' – '+f.al:''),badge(f.stato==='attesa'?'ambra':(f.stato==='approvato'?'verde':'rosso'),f.stato==='attesa'?'In attesa':(f.stato==='approvato'?'Approvato':'Rifiutato')));}).join('')+'</div></div>';
+ return h;
+}
+function selTipo(b){b.parentNode.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});b.classList.add('on');tipoFerie=b.textContent;}
+function gm(v){if(!v)return '';var p=v.split('-');return p[2]+'/'+p[1];}
+function chiediFerie(){var d=document.getElementById('fDal').value,a=document.getElementById('fAl').value;if(!d){toast('Scegli almeno il primo giorno');return;}S2.ferie.push({id:Date.now(),chi:OP,tipo:tipoFerie,dal:gm(d),al:gm(a||d),gi:[],stato:'attesa',nota:document.getElementById('fNota').value});toast('Richiesta mandata al titolare');vai('o-ferie');}
+
+/* ===== C · PAGINA DEL COMMITTENTE ===== */
+function titComm(){
+ return '<div class="sotto">Ogni cliente ha un suo link, come le famiglie dei cuccioli. Vede solo il suo lavoro.</div><div class="card"><div class="lista">'+
+  riga('committente','bronzo','Famiglia Rossi','Bagno via Roma 12 · 1 documento da firmare','<span class="btn" onclick="toast(\'Link copiato\')">Copia link</span>')+
+  riga('committente','bronzo','Condominio Le Valli','Caldaia · acconto non ancora pagato','<span class="btn" onclick="toast(\'Link copiato\')">Copia link</span>')+
+ '</div></div><div class="sotto">Cosa vede il cliente: avanzamento dei lavori, foto con la data, documenti da firmare, pagamenti e messaggi. Per vederlo scegli «Committente» all\'inizio.</div>';
+}
+function comHome(){
+ var a=S2.avanz,fd=S2.firmeCom.filter(function(f){return !f.fatto;}).length,nl=mieiMsg(COM).filter(function(m){return !m.letti[COM];}).length;
+ var h='<div class="card"><div style="font-weight:700">Rifacimento bagno · via Roma 12</div><div class="sotto" style="margin:0">Idraulica Bianchi · fine prevista 08/11/2026</div><div class="prog"><i style="width:'+a.perc+'%"></i></div><div style="font-size:12px;color:var(--muted)">Lavori fatti al '+a.perc+'%</div><div class="lista" style="margin-top:6px">'+
+  a.fasi.map(function(f){return '<div class="riga">'+(f[1]?SP:'<span class="vuoto"></span>')+'<div class="testo"><div class="n">'+f[0]+'</div></div></div>';}).join('')+'</div></div>';
+ h+='<div class="griglia">'+tile('c-foto','oggi','petrolio','Foto dei lavori',S2.foto.length+' foto')+tile('c-firme','firma','indaco','Da firmare',fd?fd+' da firmare':'Tutto firmato',fd?'a':'')+tile('c-pag','pagamenti','oliva','Pagamenti','Prossima rata il 31/10','a')+tile('c-msg','bacheca','blu','Messaggi',nl?nl+' da leggere':'Tutti letti',nl?'a':'')+'</div>';
+ return h;
+}
+function comFoto(){return '<div class="card"><div class="foto">'+S2.foto.map(function(f){return '<div>'+f[0]+' · '+f[1]+'</div>';}).join('')+'</div></div>';}
+function comPag(){var p=S2.pag[0];return '<div class="card"><div class="lista">'+p.rate.map(rigaRata).join('')+'</div></div>';}
+
+/* ===== D · COSTI DEL CANTIERE ===== */
+function titCosti(){
+ var h='<div class="sotto">Costo di un\'ora di lavoro: '+euro(S2.costoOra)+' (lo imposti tu) · le ore arrivano dalle timbrature e dai rapportini.</div>';
+ S2.costi.forEach(function(c){
+  var ore=c.ore*S2.costoOra,spesi=ore+c.mat+c.sub,resta=c.prev-spesi,perc=Math.round(spesi/c.prev*100);
+  var st=perc>=90?'r':(perc>=75?'a':'');
+  h+=sezione(c.c,st,'speso '+perc+'% del preventivo','<div class="cifre" style="margin:4px 0 8px"><div><div class="v">'+euro(c.prev)+'</div><div class="l">Preventivo</div></div><div><div class="v">'+euro(spesi)+'</div><div class="l">Speso finora</div></div><div><div class="v" style="color:var(--'+(resta>=0?'verde':'rosso')+')">'+euro(resta)+'</div><div class="l">Margine che resta</div></div></div><div class="prog"><i style="width:'+Math.min(perc,100)+'%;background:var(--'+(st==='r'?'rosso':st==='a'?'ambra':'verde')+')"></i></div><div class="lista">'+
+   riga('ore','ardesia','Manodopera',c.ore+' ore × '+euro(S2.costoOra),'<b>'+euro(ore)+'</b>')+riga('materiali','oliva','Materiali','Dalle bolle e dai rapportini','<b>'+euro(c.mat)+'</b>')+riga('sub','bronzo','Subappaltatori','Fatture ricevute','<b>'+euro(c.sub)+'</b>')+'</div>',true);
+ });
+ return h;
+}
+
+/* ===== E · MATERIALI E FURGONE ===== */
+function titMat(){
+ var h='';
+ if(S2.ordine.length)h+='<div class="card"><div style="font-weight:600;margin-bottom:4px">Da ordinare</div><div class="lista">'+S2.ordine.map(function(o){return riga('','',o[0],'Quantità: '+o[1]+' '+o[2]);}).join('')+'</div><span class="btn pieno" style="margin-top:8px" onclick="S2.ordine=[];toast(\'Ordine pronto da mandare al fornitore\');vai(\'t-mat\')">Prepara l\'ordine per il fornitore</span></div>';
+ S2.mat.forEach(function(m,pi){
+  var sotto=m.v.filter(function(x){return x[1]<x[2];}).length;
+  h+=sezione(m.p,sotto?'a':'',sotto?sotto+' sotto scorta':'Tutto c\'è','<div class="lista">'+m.v.map(function(x,i){var basso=x[1]<x[2];var inOrd=S2.ordine.some(function(o){return o[0]===x[0];});return riga('materiali',basso?'ambra':'oliva',x[0],'Ci sono '+x[1]+' '+x[3]+' · minimo '+x[2],basso?(inOrd?badge('ardesia','In ordine'):'<span class="btn" onclick="ordina('+pi+','+i+')">Ordina</span>'):'');}).join('')+'</div>');
+ });
+ return h;
+}
+function ordina(pi,i){var x=S2.mat[pi].v[i];S2.ordine.push([x[0],x[2]*2-x[1],x[3]]);toast('Aggiunto all\'ordine');vai('t-mat');}
+function opMat(){
+ var f=S2.mat[0];
+ return '<div class="sotto">Quando prendi qualcosa dal furgone segnalo qui: il titolare vede cosa manca.</div><div class="card"><div class="lista">'+f.v.map(function(x,i){return riga('materiali',x[1]<x[2]?'ambra':'oliva',x[0],'Ci sono '+x[1]+' '+x[3],'<span class="btn" onclick="usa('+i+')">Ne ho usato 1</span>');}).join('')+'</div></div>';
+}
+function usa(i){var x=S2.mat[0].v[i];if(x[1]>0)x[1]--;toast('Segnato');vai('o-mat');}
+
+/* ===== F · ACCONTI E PAGAMENTI ===== */
+var colRata={pagato:'verde',attesa:'ambra',scaduto:'rosso',futuro:'ardesia'},txtRata={pagato:'Pagato',attesa:'In scadenza',scaduto:'Non pagato',futuro:'Più avanti'};
+function rigaRata(r,k,pi){var az=(pi!==undefined&&r[3]!=='pagato')?'<span class="btn verde" onclick="pagato('+pi+','+k+')">Segna pagato</span>':'';return riga('pagamenti',colRata[r[3]],r[0]+' · '+euro(r[1]),(r[3]==='pagato'?'Pagato il ':'Entro il ')+r[2],badge(colRata[r[3]],txtRata[r[3]])+az);}
+function titPag(){
+ var inc=0,da=0;S2.pag.forEach(function(p){p.rate.forEach(function(r){if(r[3]==='pagato')inc+=r[1];else da+=r[1];});});
+ var h='<div class="card"><div class="cifre" style="grid-template-columns:1fr 1fr"><div><div class="v" style="color:var(--verde)">'+euro(inc)+'</div><div class="l">Incassato</div></div><div><div class="v">'+euro(da)+'</div><div class="l">Ancora da incassare</div></div></div></div>';
+ S2.pag.forEach(function(p,pi){var st=p.rate.some(function(r){return r[3]==='scaduto';})?'r':(p.rate.some(function(r){return r[3]==='attesa';})?'a':'');h+=sezione(p.c+' · '+p.comm,st,p.rate.length+' rate','<div class="lista">'+p.rate.map(function(r,k){return rigaRata(r,k,pi);}).join('')+'</div>');});
+ return h;
+}
+function pagato(pi,k){S2.pag[pi].rate[k][3]='pagato';S2.pag[pi].rate[k][2]='oggi';toast('Segnato come pagato');vai('t-pag');}
+
+/* ===== G · QUASI INCIDENTI E INFORTUNI ===== */
+function titInc(){
+ var h='<div class="sotto">Registro con data, foto e cosa è stato fatto per rimediare. Le segnalazioni degli operai arrivano qui.</div>';
+ S2.inc.slice().reverse().forEach(function(x){
+  var aperto=x.stato!=='chiuso';
+  h+=sezione(x.tipo+' · '+x.data,x.tipo==='Infortunio'?'r':(aperto?'a':''),x.c,'<div class="lista">'+riga('','','Chi',x.chi)+riga('','','Cosa è successo',x.t)+riga('','','Cosa è stato fatto',x.rimedio||'Ancora da decidere',aperto?'<span class="btn" onclick="chiudiInc('+x.id+')">Segna come risolto</span>':badge('verde','Risolto'))+'</div>',aperto);
+ });
+ return h;
+}
+function chiudiInc(id){S2.inc.forEach(function(x){if(x.id===id){x.stato='chiuso';x.rimedio=x.rimedio||'Risolto dal titolare';}});toast('Segnato come risolto');vai('t-inc');}
+
+/* ===== H · TESSERINO DI RICONOSCIMENTO ===== */
+function opTessera(){
+ return '<div class="tessera"><div class="fotot"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></div><div><div class="r">Lavoratore</div><div class="v">'+OP+'</div><div class="r">Datore di lavoro</div><div class="v">Idraulica Bianchi</div><div class="r">Assunto il</div><div class="v">01/03/2021</div></div></div>'+
+  '<div class="riquadro-avviso" style="margin-top:12px">Da verificare se il tesserino sul telefono vale come tessera di riconoscimento in cantiere. Finché non è chiarito, tenere anche quello di plastica.</div>';
+}
+
+/* ===== SCELTA DELLA VISTA (solo per l'anteprima) ===== */
+function sceltaVista(){
+ return '<div class="sotto">Solo per provare l\'anteprima: scegli chi sta usando l\'app. Nel programma vero ognuno entra con il suo link e vede solo la sua parte.</div><div class="griglia">'+
+  tile('tit','titolare','blu','Titolare','Vede e comanda tutto')+
+  tile('op','persona','indaco','Operaio','Luca Verdi, dal telefono')+
+  tile('sub','sub','bronzo','Subappaltatore','Cartongessi Delta')+
+  tile('com','committente','oliva','Committente','Famiglia Rossi, il cliente')+'</div>';
+}
+
+/* ===== TITOLARE ===== */
+function nonLetti(m){return m.dest.filter(function(d){return !m.letti[d];}).length;}
+function titHome(){
+ var pres=S.presenze.filter(function(p){return !p.e;}).length;
+ var rap=S.rapportini.filter(function(r){return r.stato==='attesa';}).length;
+ var docs=S.docSub.filter(function(d){return d.stato==='attesa';}).length;
+ var nl=S.messaggi.reduce(function(a,m){return a+nonLetti(m);},0);
+ return '<div class="griglia">'+
+  tile('t-bacheca','bacheca','blu','Messaggi',nl+' letture mancanti',nl?'a':'')+
+  tile('t-presenze','presenze','petrolio','Presenze di oggi',pres?pres+' non ha timbrato':'Tutti presenti',pres?'r':'')+
+  tile('t-rapportini','rapportino','ardesia','Rapportini',rap+' da approvare',rap?'a':'')+
+  tile('t-docsub','doc','bronzo','Documenti subappaltatori',docs+' da controllare',docs?'a':'')+
+  tile('t-cal','calendario','petrolio','Calendario squadre','Settimana dal 26 al 30')+
+  tile('t-ferie','ferie','ambra','Ferie e permessi',S2.ferie.filter(function(f){return f.stato==='attesa';}).length+' da decidere',S2.ferie.some(function(f){return f.stato==='attesa';})?'a':'')+
+  tile('t-comm','committente','oliva','Pagina dei clienti','2 clienti con il link')+
+  tile('t-costi','costi','ardesia','Costi dei cantieri','Speso e margine')+
+  tile('t-mat','materiali','oliva','Materiali e furgone',S2.mat.reduce(function(a,m){return a+m.v.filter(function(x){return x[1]<x[2];}).length;},0)+' sotto scorta','a')+
+  tile('t-pag','pagamenti','oliva','Acconti e pagamenti','1 rata non pagata','r')+
+  tile('t-inc','incidente','rosso','Quasi incidenti',S2.inc.filter(function(x){return x.stato!=='chiuso';}).length+' da risolvere',S2.inc.some(function(x){return x.stato!=='chiuso';})?'a':'')+
+  tile('t-timbra','ingranaggio','ardesia','Come si timbra',S.timbra.qr&&S.timbra.gps?'QR e posizione':(S.timbra.gps?'Posizione':'QR del cantiere'))+
+ '</div>';
+}
+function titBacheca(){
+ var h='<div class="card"><label class="et">A chi</label><div class="scelte" id="destSel"><button class="on" onclick="selDest(this)">Tutti</button><button onclick="selDest(this)">Squadra Bagno via Roma</button><button onclick="selDest(this)">Squadra Caldaia Le Valli</button><button onclick="selDest(this)">Cartongessi Delta</button><button onclick="selDest(this)">Elettrica Po srl</button><button onclick="selDest(this)">Famiglia Rossi</button></div>'+
+   '<label class="et">Messaggio</label><textarea class="campo" id="nuovoMsg" rows="3" placeholder="Scrivi qui il messaggio"></textarea><span class="btn pieno" onclick="inviaMsg()">Invia</span></div>';
+ h+='<h2>Messaggi inviati</h2>';
+ S.messaggi.slice().reverse().forEach(function(m){
+  var nl=nonLetti(m);
+  var chi=m.dest.map(function(d){return '<div class="riga">'+(m.letti[d]?SP:'<span class="vuoto"></span>')+'<div class="testo"><div class="n">'+d+'</div><div class="d">'+(m.letti[d]?'Letto '+m.letti[d]:'Non ancora letto')+'</div></div></div>';}).join('');
+  h+=sezione(m.a+' · '+m.quando,nl?'a':'',(m.dest.length-nl)+' su '+m.dest.length+' letto','<div class="testo-m">'+m.t+'</div><div class="lista">'+chi+'</div>');
+ });
+ return h;
+}
+var destScelto='Tutti';
+function selDest(b){b.parentNode.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});b.classList.add('on');destScelto=b.textContent;}
+function inviaMsg(){
+ var t=document.getElementById('nuovoMsg').value.trim(); if(!t){toast('Scrivi prima il messaggio');return;}
+ var mappa={'Tutti':['Luca Verdi','Marco Neri','Ahmed Benali','Cartongessi Delta','Elettrica Po srl'],'Squadra Bagno via Roma':['Luca Verdi','Marco Neri'],'Squadra Caldaia Le Valli':['Luca Verdi','Ahmed Benali'],'Cartongessi Delta':['Cartongessi Delta'],'Elettrica Po srl':['Elettrica Po srl'],'Famiglia Rossi':['Famiglia Rossi']};
+ S.messaggi.push({id:Date.now(),a:destScelto,da:'Titolare',quando:'Oggi '+oraAdesso(),t:t,dest:mappa[destScelto],letti:{}});
+ toast('Inviato: arriva l\'avviso sul telefono'); vai('t-bacheca');
+}
+function titPresenze(){
+ var h='<div class="sotto">Oggi · modo di timbratura: '+(S.timbra.qr&&S.timbra.gps?'QR o posizione':(S.timbra.gps?'posizione':'QR del cantiere'))+'</div><div class="card"><div class="lista">';
+ S.presenze.forEach(function(p){
+  var b=!p.e?badge('rosso','Non ha timbrato'):(p.ritardo?badge('ambra','Entrato '+p.e):badge('verde','Entrato '+p.e));
+  h+=riga('persona','indaco',p.n,p.c+(p.e?' · con '+p.modo:''),b);
+ });
+ return h+'</div></div>';
+}
+function titRapportini(){
+ var h='';
+ S.rapportini.forEach(function(r){
+  var st=r.stato==='attesa'?'a':'';
+  var az=r.stato==='attesa'?'<div class="barra-az" style="margin-top:8px"><span class="btn verde" onclick="esitoRap('+r.id+',\'approvato\')">Approva</span><span class="btn rosso" onclick="esitoRap('+r.id+',\'rimandato\')">Rimanda indietro</span></div>':'<div style="margin-top:6px">'+badge(r.stato==='approvato'?'verde':'rosso',r.stato==='approvato'?'Approvato':'Rimandato')+'</div>';
+  h+=sezione(r.chi+' · '+r.data,st,r.c,'<div class="lista">'+riga('','', 'Ore',r.ore+' ore')+riga('','','Materiali',r.mat)+riga('','','Note',r.note||'Nessuna')+riga('','','Foto',r.foto+' foto allegate','<span class="btn">Mostra</span>')+'</div>'+az,r.stato==='attesa');
+ });
+ return h;
+}
+function esitoRap(id,e){S.rapportini.forEach(function(r){if(r.id===id)r.stato=e;});toast(e==='approvato'?'Rapportino approvato':'Rimandato all\'operaio');vai('t-rapportini');}
+var colDoc={approvato:'verde',rifiutato:'rosso',attesa:'ambra',scaduto:'rosso'};
+var txtDoc={approvato:'Approvato',rifiutato:'Rifiutato',attesa:'Da controllare',scaduto:'Scaduto'};
+function titDocSub(){
+ var imprese=['Cartongessi Delta','Elettrica Po srl'],h='<div class="sotto">I documenti li caricano le imprese. Tu approvi o rifiuti con un commento, e loro ricevono l\'avviso.</div>';
+ imprese.forEach(function(imp){
+  var dd=S.docSub.filter(function(d){return d.imp===imp;});
+  var st=dd.some(function(d){return d.stato==='rifiutato'||d.stato==='scaduto';})?'r':(dd.some(function(d){return d.stato==='attesa';})?'a':'');
+  var html=dd.map(function(d){
+   var az=d.stato==='attesa'?'<div class="barra-az" style="margin:6px 0 0 44px"><span class="btn">Mostra</span><span class="btn verde" onclick="esitoDoc('+d.id+',\'approvato\')">Approva</span><span class="btn rosso" onclick="esitoDoc('+d.id+',\'rifiutato\')">Rifiuta</span></div>':'';
+   return riga('doc',colDoc[d.stato],d.doc,d.comm||'Caricato, da guardare',badge(colDoc[d.stato],txtDoc[d.stato]))+az;
+  }).join('');
+  h+=sezione(imp,st,dd.length+' documenti','<div class="lista">'+html+'</div>');
+ });
+ return h;
+}
+function esitoDoc(id,e){S.docSub.forEach(function(d){if(d.id===id){d.stato=e;d.comm=e==='approvato'?'Approvato oggi.':'Rifiutato: da ricaricare.';}});toast('Fatto: l\'impresa riceve l\'avviso');vai('t-docsub');}
+function titTimbra(){
+ var h='<div class="card">';
+ h+='<div class="interr">'+ico('qr','petrolio')+'<div class="testo" style="flex:1"><div style="font-weight:600">QR del cantiere</div><div style="font-size:12px;color:var(--muted)">In ogni cantiere si attacca un foglio con il codice. L\'operaio lo inquadra quando arriva e quando va via. La posizione del telefono non viene presa.</div></div><button class="sw '+(S.timbra.qr?'on':'')+'" onclick="cambiaTimbra(\'qr\')"></button></div>';
+ h+='<div class="interr">'+ico('mappa','petrolio')+'<div class="testo" style="flex:1"><div style="font-weight:600">Posizione al momento della timbratura</div><div style="font-size:12px;color:var(--muted)">La posizione viene presa solo quando l\'operaio timbra, mai durante il lavoro. Dopo il controllo resta solo il nome del cantiere.</div></div><button class="sw '+(S.timbra.gps?'on':'')+'" onclick="cambiaTimbra(\'gps\')"></button></div>';
+ h+='</div>';
+ if(S.timbra.gps===false&&S.timbra._chiedi){
+  h+='<div class="riquadro-avviso"><b>Prima di accendere la posizione</b><br>Serve l\'accordo con i sindacati oppure l\'autorizzazione dell\'Ispettorato del lavoro (articolo 4 dello Statuto dei lavoratori), e ogni operaio deve firmare l\'informativa.<label class="autodich" style="margin-bottom:0"><input type="checkbox" id="autCheck"> Ho l\'accordo sindacale o l\'autorizzazione dell\'Ispettorato</label><div class="barra-az" style="margin:8px 0 0"><span class="btn pieno" onclick="accendiGps()">Accendi la posizione</span><span class="btn" onclick="S.timbra._chiedi=false;vai(\'t-timbra\')">Annulla</span></div></div>';
+ }
+ if(S.timbra.gps){h+='<div class="sotto">Informativa: '+(S.firmeOp[2].fatto?'firmata da Luca Verdi':'da far firmare')+' · gli operai che non l\'hanno firmata la ricevono da firmare nell\'app.</div>';}
+ if(S.timbra.qr){h+='<div class="card" style="text-align:center"><div style="font-weight:600">Foglio QR · Bagno via Roma 12</div><svg class="qr" viewBox="0 0 29 29">'+qrFinto()+'</svg><span class="btn">Stampa il foglio</span></div>';}
+ return h;
+}
+function qrFinto(){var s='',seed=7;function r(){seed=(seed*9301+49297)%233280;return seed/233280;}
+ function quad(x,y){s+='<rect x="'+x+'" y="'+y+'" width="7" height="7" fill="#1f2a35"/><rect x="'+(x+1)+'" y="'+(y+1)+'" width="5" height="5" fill="#fff"/><rect x="'+(x+2)+'" y="'+(y+2)+'" width="3" height="3" fill="#1f2a35"/>';}
+ for(var y=0;y<29;y++)for(var x=0;x<29;x++){if((x<8&&y<8)||(x>20&&y<8)||(x<8&&y>20))continue;if(r()>.55)s+='<rect x="'+x+'" y="'+y+'" width="1" height="1" fill="#1f2a35"/>';}
+ quad(0,0);quad(22,0);quad(0,22);return s;}
+function cambiaTimbra(k){
+ if(k==='gps'&&!S.timbra.gps){S.timbra._chiedi=true;vai('t-timbra');return;}
+ if(S.timbra[k]&&!(k==='qr'?S.timbra.gps:S.timbra.qr)){toast('Almeno un modo di timbrare deve restare acceso');return;}
+ S.timbra[k]=!S.timbra[k];vai('t-timbra');
+}
+function accendiGps(){if(!document.getElementById('autCheck').checked){toast('Spunta prima la casella dell\'accordo');return;}S.timbra.gps=true;S.timbra.autorizz=true;S.timbra._chiedi=false;toast('Posizione accesa');vai('t-timbra');}
+
+/* ===== OPERAIO ===== */
+function mieiMsg(chi){return S.messaggi.filter(function(m){return m.dest.indexOf(chi)>-1;});}
+function opHome(){
+ var nl=mieiMsg(OP).filter(function(m){return !m.letti[OP];}).length;
+ var fd=S.firmeOp.filter(function(f){return !f.fatto;}).length;
+ return '<div class="card">'+riga('cantiere','petrolio','Oggi: Bagno via Roma 12','Via Roma 12, Ostellato · inizio 7:30 · con Marco Neri','<span class="btn">Mappa</span>')+'</div>'+
+  '<div class="griglia">'+
+   tile('o-timbra','presenze','petrolio','Timbra',S.timbOp.e?(S.timbOp.u?'Giornata chiusa':'Entrato '+S.timbOp.e):'Non hai ancora timbrato',S.timbOp.e?'':'a')+
+   tile('o-msg','bacheca','blu','Messaggi',nl?nl+' da leggere':'Tutti letti',nl?'a':'')+
+   tile('o-rapportino','rapportino','ardesia','Rapportino','Ore, materiali e foto di oggi')+
+   tile('o-ore','ore','ardesia','Le mie ore','Questa settimana')+
+   tile('o-scadenze','corso','indaco','Corsi e visite','1 in scadenza','a')+
+   tile('o-firme','firma','indaco','Da firmare',fd?fd+' da firmare':'Tutto firmato',fd?'a':'')+
+   tile('o-cal','calendario','petrolio','La mia settimana','Dove vado ogni giorno')+
+   tile('o-ferie','ferie','ambra','Ferie e permessi','Chiedi un giorno')+
+   tile('o-mat','materiali','oliva','Furgone','Segna cosa usi')+
+   tile('o-tessera','tessera','blu','Tesserino','Da mostrare in cantiere')+
+   tile('o-segnala','segnala','rosso','Segnala','Problema o quasi incidente')+
+  '</div>';
+}
+function opTimbra(){
+ var h='<div class="card" style="text-align:center"><div class="sotto" style="margin:0">Bagno via Roma 12</div>';
+ if(!S.timbOp.e){h+='<div class="grande-ora">--:--</div><div class="sotto">Non hai ancora timbrato</div>';}
+ else{h+='<div class="grande-ora">'+S.timbOp.e+(S.timbOp.u?' – '+S.timbOp.u:'')+'</div><div class="sotto">'+(S.timbOp.u?'Giornata chiusa':'Entrato')+'</div>';}
+ h+='</div>';
+ if(S.timbOp.u){return h;}
+ var fase=S.timbOp.e?'uscita':'entrata';
+ if(S.timbra.qr)h+='<span class="btn pieno grande" onclick="timbra(\'QR\')">Inquadra il QR del cantiere ('+fase+')</span><div style="height:8px"></div>';
+ if(S.timbra.gps)h+='<span class="btn grande" onclick="timbra(\'posizione\')">Timbra '+fase+' con la posizione</span><div class="sotto" style="margin-top:6px">La posizione viene presa solo adesso, per confermare che sei in cantiere.</div>';
+ return h;
+}
+function timbra(modo){var o=oraAdesso();if(!S.timbOp.e){S.timbOp.e=o;S.presenze[0].e=o;S.presenze[0].modo=modo;toast('Entrata registrata alle '+o);}else{S.timbOp.u=o;toast('Uscita registrata alle '+o);}vai('o-timbra');}
+function listaMsg(chi){
+ var h='';
+ mieiMsg(chi).slice().reverse().forEach(function(m){
+  var letto=m.letti[chi];
+  h+='<div class="card"><div class="msg"><div class="chi">Dal titolare · '+m.quando+' · a: '+m.a+'</div><div class="testo-m">'+m.t+'</div>'+(letto?'<span style="font-size:12px;color:var(--verde);font-weight:600">Letto '+letto+'</span>':'<span class="btn pieno" onclick="leggi('+m.id+',\''+chi+'\')">Ho letto</span>')+'</div></div>';
+ });
+ return h;
+}
+function leggi(id,chi){S.messaggi.forEach(function(m){if(m.id===id)m.letti[chi]='Oggi '+oraAdesso();});toast('Il titolare vede che hai letto');vai(chi===OP?'o-msg':(chi===SUB?'s-msg':'c-msg'));}
+function opRapportino(){
+ return '<div class="card"><label class="et">Cantiere</label><div class="campo" style="background:#f8f9fb">Bagno via Roma 12</div>'+
+  '<label class="et">Ore lavorate</label><input class="campo" type="number" value="8">'+
+  '<label class="et">Materiali usati</label><textarea class="campo" rows="2" placeholder="Es. tubo multistrato 16 mm, 10 m"></textarea>'+
+  '<label class="et">Note</label><textarea class="campo" rows="2"></textarea>'+
+  '<div class="barra-az"><span class="btn">Aggiungi foto</span></div><span class="btn pieno grande" onclick="toast(\'Rapportino inviato al titolare\');vai(\'op\')">Invia rapportino</span></div>';
+}
+function opOre(){
+ var g=[['Lun 19',8,0],['Mar 20',8,0],['Mer 21',9,1],['Gio 22',8,0],['Ven 23',8,0]],h='<div class="card" style="padding:0"><table><tr><th>Giorno</th><th class="num-c">Ore</th><th class="num-c">Straordinario</th></tr>',t=0,s=0;
+ g.forEach(function(x){t+=x[1];s+=x[2];h+='<tr><td>'+x[0]+'</td><td class="num-c">'+x[1]+'</td><td class="num-c">'+(x[2]||'–')+'</td></tr>';});
+ return h+'<tr><th>Totale</th><th class="num-c">'+t+'</th><th class="num-c">'+s+'</th></tr></table></div>';
+}
+function opScadenze(){
+ return '<div class="card"><div class="lista">'+riga('corso','ambra','Formazione lavoratori (aggiornamento)','Scade il 15/11/2026 · il titolare ti iscrive al corso',badge('ambra','In scadenza'))+riga('corso','verde','Lavori in quota','Scade il 10/04/2028',badge('verde','In regola'))+riga('corso','verde','Visita medica periodica','12/02/2027',badge('verde','In regola'))+'</div></div>';
+}
+function listaFirme(arr,chi){
+ return '<div class="card"><div class="lista">'+arr.map(function(f){
+  return '<div class="riga">'+(f.fatto?SP:'<span class="vuoto"></span>')+'<div class="testo"><div class="n">'+f.t+'</div><div class="d">'+(f.fatto?'Firmato il '+f.fatto:'Da firmare')+'</div></div>'+(f.fatto?'<span class="btn">Mostra firma</span>':'<span class="btn pieno" onclick="apriFirma('+f.id+',\''+chi+'\')">Firma</span>')+'</div>';
+ }).join('')+'</div></div>';
+}
+var tipoSeg='Problema';
+function selSeg(b){b.parentNode.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});b.classList.add('on');tipoSeg=b.textContent;}
+function opSegnala(){
+ var h='<div class="card"><label class="et">Che cosa</label><div class="scelte"><button class="'+(tipoSeg==='Problema'?'on':'')+'" onclick="selSeg(this)">Problema</button><button class="'+(tipoSeg==='Quasi incidente'?'on':'')+'" onclick="selSeg(this)">Quasi incidente</button><button class="'+(tipoSeg==='Infortunio'?'on':'')+'" onclick="selSeg(this)">Infortunio</button></div><label class="et">Cosa succede</label><textarea class="campo" id="segTesto" rows="3" placeholder="Es. manca il parapetto al primo piano"></textarea><div class="barra-az"><span class="btn">Scatta foto</span></div><span class="btn pieno grande" onclick="inviaSeg()">Invia al titolare</span></div>';
+ if(S.segnalazioni.length)h+='<h2>Inviate</h2><div class="card"><div class="lista">'+S.segnalazioni.map(function(s){return riga('segnala','rosso',s.t,s.q);}).join('')+'</div></div>';
+ return h;
+}
+function inviaSeg(){var t=document.getElementById('segTesto').value.trim();if(!t){toast('Scrivi prima cosa succede');return;}S.segnalazioni.push({t:tipoSeg+': '+t,q:'Oggi '+oraAdesso()});if(tipoSeg!=='Problema')S2.inc.push({id:Date.now(),tipo:tipoSeg,data:'Oggi',c:'Bagno via Roma 12',chi:OP,t:t,rimedio:'',stato:'aperto'});toast(tipoSeg==='Problema'?'Segnalazione inviata':'Inviata e messa nel registro');vai('o-segnala');}
+
+/* ===== SUBAPPALTATORE ===== */
+function subHome(){
+ var mie=S.docSub.filter(function(d){return d.imp===SUB;});
+ var prob=mie.filter(function(d){return d.stato==='rifiutato'||d.stato==='scaduto';}).length;
+ var nl=mieiMsg(SUB).filter(function(m){return !m.letti[SUB];}).length;
+ var fd=S.firmeSub.filter(function(f){return !f.fatto;}).length;
+ return '<div class="griglia">'+
+  tile('s-doc','doc','bronzo','I miei documenti',prob?prob+' da sistemare':'Tutto a posto',prob?'r':'')+
+  tile('s-cantieri','cantiere','petrolio','I miei cantieri','1 cantiere per Idraulica Bianchi')+
+  tile('s-operai','operai','indaco','I miei operai','1 non autorizzato','r')+
+  tile('s-msg','bacheca','blu','Messaggi',nl?nl+' da leggere':'Tutti letti',nl?'a':'')+
+  tile('s-firme','firma','indaco','Da firmare',fd?fd+' da firmare':'Tutto firmato',fd?'a':'')+
+ '</div>';
+}
+function subDoc(){
+ var mie=S.docSub.filter(function(d){return d.imp===SUB;});
+ return '<div class="sotto">Caricali una volta sola: valgono per tutti i cantieri di Idraulica Bianchi.</div><div class="card"><div class="lista">'+mie.map(function(d){
+  var b=d.stato==='approvato'?'<span class="btn">Mostra</span>':'<span class="btn pieno" onclick="ricarica('+d.id+')">'+(d.stato==='attesa'?'Mostra':'Carica nuovo')+'</span>';
+  return riga('doc',colDoc[d.stato],d.doc,txtDoc[d.stato]+(d.comm?' · '+d.comm:''),b);
+ }).join('')+'</div></div>';
+}
+function ricarica(id){S.docSub.forEach(function(d){if(d.id===id&&d.stato!=='attesa'){d.stato='attesa';d.comm='Caricato oggi, in attesa del titolare.';}});toast('Caricato: il titolare riceve l\'avviso');vai('s-doc');}
+function subCantieri(){
+ return '<div class="card"><div class="titolo" style="font-size:16px">Caldaia condominio Le Valli</div><div class="sotto">Comacchio · dal 28/10 al 05/12/2026 · ingresso dal cancello di via Mare</div><div class="lista">'+
+  riga('ore','ardesia','Orari','7:30 – 12:00 e 13:00 – 17:00')+
+  riga('persona','indaco','Referente','Luca Verdi (Idraulica Bianchi)','<span class="btn">Chiama</span>')+
+  riga('doc','ardesia','POS del cantiere','Da leggere e firmare per presa visione','<span class="btn" onclick="vai(\'s-firme\')">Vai a firmare</span>')+
+  riga('mappa','petrolio','Indirizzo','Via Mare 4, Comacchio','<span class="btn">Mappa</span>')+
+ '</div></div>';
+}
+function subOperai(){
+ return '<div class="card"><div class="lista">'+riga('persona','indaco','G. Rizzo','Attestato caricato, il titolare lo sta controllando',badge('ambra','In attesa'))+riga('persona','rosso','P. Sala','Attestato scaduto il 10/10/2026: non può entrare in cantiere',badge('rosso','Non autorizzato'))+'</div></div><span class="btn pieno" onclick="vai(\'s-doc\')">Carica l\'attestato nuovo</span>';
+}
+
+/* ===== FIRMA COL DITO ===== */
+var firmaCorrente=null, disegnato=false;
+function apriFirma(id,chi){
+ var arr=chi==='sub'?S.firmeSub:(chi==='com'?S2.firmeCom:S.firmeOp); firmaCorrente=arr.find(function(f){return f.id===id;});
+ document.getElementById('firmaTitolo').textContent=firmaCorrente.t;
+ document.getElementById('firmaSotto').textContent=firmaCorrente.d;
+ document.getElementById('firmaDich').textContent='Sono '+(chi==='sub'?'il titolare di '+SUB:(chi==='com'?'Mario Rossi':OP))+' e firmo questo documento.';
+ document.getElementById('firmaCheck').checked=false;
+ document.getElementById('velo').classList.add('aperto'); firmaCorrente._chi=chi; preparaTela();
+}
+function chiudiFirma(){document.getElementById('velo').classList.remove('aperto');}
+function preparaTela(){
+ var c=document.getElementById('tela'),r=c.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+ c.width=r.width*dpr;c.height=r.height*dpr;var x=c.getContext('2d');x.scale(dpr,dpr);x.lineWidth=2.2;x.lineCap='round';x.strokeStyle='#1f2a35';disegnato=false;
+ var giu=false;function p(e){var t=e.touches?e.touches[0]:e;return [t.clientX-r.left,t.clientY-r.top];}
+ c.onpointerdown=function(e){giu=true;r=c.getBoundingClientRect();var q=p(e);x.beginPath();x.moveTo(q[0],q[1]);};
+ c.onpointermove=function(e){if(!giu)return;var q=p(e);x.lineTo(q[0],q[1]);x.stroke();disegnato=true;};
+ c.onpointerup=c.onpointerleave=function(){giu=false;};
+}
+function pulisci(){var c=document.getElementById('tela');c.getContext('2d').clearRect(0,0,c.width,c.height);disegnato=false;}
+function confermaFirma(){
+ if(!document.getElementById('firmaCheck').checked){toast('Spunta prima la casella');return;}
+ if(!disegnato){toast('Firma col dito nel riquadro');return;}
+ var d=new Date();firmaCorrente.fatto=('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear()+' '+oraAdesso();
+ chiudiFirma();toast('Firmato: resta registrato con data e ora');vai(firmaCorrente._chi==='sub'?'s-firme':(firmaCorrente._chi==='com'?'c-firme':'o-firme'));
+}
+
+
 /* ===== AIUTI ===== */
 function ico(n,c){return '<div class="ico" style="background:var(--'+c+')"><svg viewBox="0 0 24 24">'+I[n]+'</svg></div>';}
 var FR='<svg class="freccia" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
@@ -640,9 +1111,9 @@ ADESSO=adesso();QD.ora[0]='Da adesso ('+ADESSO+')';QD.ora[1]=ADESSO;
 var ROLE=null,VER=0,ME=null,DISP=[],BUSYS=false,DIRTY=false,ERRS='',PICK=null,PINTXT='';
 try{ME=JSON.parse(localStorage.getItem('cantieriDisp')||'null');}catch(e){}
 function meSave(){try{if(ME)localStorage.setItem('cantieriDisp',JSON.stringify(ME));else localStorage.removeItem('cantieriDisp');}catch(e){}}
-function stato(){return {CANT:CANT,PERS:PERS,TODO:TODO,AVV:AVV,REQ:REQ,REQQ:REQQ,RISP:RISP,MSGS:MSGS,NOTIF:NOTIF};}
+function stato(){return {CANT:CANT,PERS:PERS,TODO:TODO,AVV:AVV,REQ:REQ,REQQ:REQQ,RISP:RISP,MSGS:MSGS,NOTIF:NOTIF,S:S,S2:S2};}
 var BASE=JSON.stringify(stato());
-function apply(o){CANT=o.CANT;PERS=o.PERS;TODO=o.TODO;AVV=o.AVV||{};REQ=o.REQ||null;REQQ=o.REQQ||[];RISP=o.RISP||{};MSGS=o.MSGS||[];NOTIF=o.NOTIF||{};setTimeout(function(){LASTJ=JSON.stringify(stato());},0);}
+function apply(o){CANT=o.CANT;PERS=o.PERS;TODO=o.TODO;AVV=o.AVV||{};REQ=o.REQ||null;REQQ=o.REQQ||[];RISP=o.RISP||{};MSGS=o.MSGS||[];NOTIF=o.NOTIF||{};if(o.S)S=o.S;if(o.S2)S2=o.S2;setTimeout(function(){LASTJ=JSON.stringify(stato());},0);}
 function api(m,path,b){return fetch(path,{method:m,headers:{'content-type':'application/json','x-disp':ME?ME.id+':'+ME.k:'','x-lang':(ROLE==='tit'?'it':(typeof LG!=='undefined'&&LG)||'it')},body:b?JSON.stringify(b):undefined}).then(function(r){return r.json().then(function(j){j._s=r.status;return j;});});}
 var SVT=null,LASTJ='';
 function save(){if(JSON.stringify(stato())===LASTJ)return;DIRTY=true;clearTimeout(SVT);SVT=setTimeout(saveNow,300);}
@@ -771,7 +1242,7 @@ function opSend(n,cn){
 }
 
 /* ===== LINGUE DEGLI OPERAI: italiano dentro l'app, le altre si scaricano dal menu (public/lang/xx.json) ===== */
-var IT={"hi": "Ciao", "time": "sono le", "news": "Novità dal titolare", "okseen": "Ok, ho visto", "reply": "Il titolare ti ha risposto", "ok": "Ok", "notclocked": "Non hai ancora timbrato", "entered": "Entrato", "dayclosed": "Giornata chiusa", "clockin": "Timbra l'entrata", "clockout": "Timbra l'uscita", "goto": "Oggi vai a", "none": "Nessun cantiere: chiedi al titolare.", "map": "Apri la mappa", "asked": "Hai chiesto dove andare alle {0}. La risposta arriva qui.", "where": "Ho finito qui · dove vado?", "wholeday": "Tutto il giorno", "week": "La mia settimana", "free": "Libero", "holiday": "Ferie", "msgs": "Messaggi", "fromboss": "Dal titolare · alle", "read": "Ho letto", "readat": "Letto alle", "nomsgs": "Nessun messaggio.", "write": "Scrivi al titolare", "rap": "Rapportino", "prob": "Problema", "inc": "Quasi incidente", "site": "Cantiere", "hours": "Ore lavorate", "mat": "Materiali usati", "notes": "Note", "what": "Cosa succede", "send": "Manda", "sent": "Mandato al titolare", "writewhat": "Scrivi cosa succede", "tToday": "Oggi", "tWeek": "Settimana", "tMsgs": "Messaggi", "tWrite": "Scrivi", "who": "Chi sei?", "worker": "Operaio", "boss": "Titolare", "name": "Come ti chiami?", "tapname": "Tocca il tuo nome", "back": "Indietro", "wait": "In attesa del titolare", "wait2": "Questo telefono è nuovo: il titolare deve approvarlo.", "code": "Codice da dire al titolare", "opens": "Appena approvato, si apre da solo.", "wrongname": "Ho sbagliato nome", "refused": "Non approvato", "removed": "Telefono tolto", "refused2": "Il titolare non ha approvato questo telefono.", "askagain": "Chiedi di nuovo", "homehint": "Sul telefono conviene prima metterla sulla schermata Home (Condividi → Aggiungi alla schermata Home) e poi aprirla da lì.", "lang": "Lingua", "inAt": "Entrata alle", "outAt": "Uscita alle", "nowGo": "Adesso vai a", "todayGo": "Oggi vai a", "fromTo": "Da {0} a venerdì vai a", "dayGo": "{0}: vai a", "from": "dalle", "approved": "Le tue ferie di giovedì e venerdì sono approvate", "notapproved": "Le tue ferie di giovedì e venerdì non sono approvate", "dayHoliday": "{0}: ferie", "dayFree": "{0}: resti libero", "worker2": "Operaio", "pick": "Scegli la lingua", "_days": ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì"]};
+var IT={"hi": "Ciao", "time": "sono le", "news": "Novità dal titolare", "okseen": "Ok, ho visto", "reply": "Il titolare ti ha risposto", "ok": "Ok", "notclocked": "Non hai ancora timbrato", "entered": "Entrato", "dayclosed": "Giornata chiusa", "clockin": "Timbra l'entrata", "clockout": "Timbra l'uscita", "goto": "Oggi vai a", "none": "Nessun cantiere: chiedi al titolare.", "map": "Apri la mappa", "asked": "Hai chiesto dove andare alle {0}. La risposta arriva qui.", "where": "Ho finito qui · dove vado?", "wholeday": "Tutto il giorno", "week": "La mia settimana", "free": "Libero", "holiday": "Ferie", "msgs": "Messaggi", "fromboss": "Dal titolare · alle", "read": "Ho letto", "readat": "Letto alle", "nomsgs": "Nessun messaggio.", "write": "Scrivi al titolare", "rap": "Rapportino", "prob": "Problema", "inc": "Quasi incidente", "site": "Cantiere", "hours": "Ore lavorate", "mat": "Materiali usati", "notes": "Note", "what": "Cosa succede", "send": "Manda", "sent": "Mandato al titolare", "writewhat": "Scrivi cosa succede", "tToday": "Oggi", "tWeek": "Settimana", "tMsgs": "Messaggi", "tWrite": "Scrivi", "who": "Chi sei?", "worker": "Operaio", "boss": "Titolare", "name": "Come ti chiami?", "tapname": "Tocca il tuo nome", "back": "Indietro", "wait": "In attesa del titolare", "wait2": "Questo telefono è nuovo: il titolare deve approvarlo.", "code": "Codice da dire al titolare", "opens": "Appena approvato, si apre da solo.", "wrongname": "Ho sbagliato nome", "refused": "Non approvato", "removed": "Telefono tolto", "refused2": "Il titolare non ha approvato questo telefono.", "askagain": "Chiedi di nuovo", "homehint": "Sul telefono conviene prima metterla sulla schermata Home (Condividi → Aggiungi alla schermata Home) e poi aprirla da lì.", "lang": "Lingua", "inAt": "Entrata alle", "outAt": "Uscita alle", "nowGo": "Adesso vai a", "todayGo": "Oggi vai a", "fromTo": "Da {0} a venerdì vai a", "dayGo": "{0}: vai a", "from": "dalle", "approved": "Le tue ferie di giovedì e venerdì sono approvate", "notapproved": "Le tue ferie di giovedì e venerdì non sono approvate", "dayHoliday": "{0}: ferie", "dayFree": "{0}: resti libero", "worker2": "Operaio", "pick": "Scegli la lingua", "_days": ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì"], "more": "Altro", "sign": "Da firmare", "courses": "Corsi e visite", "card": "Tesserino", "van": "Furgone", "myhours": "Le mie ore", "leave": "Ferie e permessi"};
 var LANGS=[['it','Italiano'],['en','English'],['ro','Română'],['sq','Shqip'],['ar','العربية'],['uk','Українська'],['fr','Français']];
 var LG='',LT=IT;
 (function(){try{LG=localStorage.getItem('cantieriLang')||'';if(LG&&LG!=='it'){var d=localStorage.getItem('cantieriLang_'+LG);if(d)LT=JSON.parse(d);else LG='';}}catch(e){}})();
@@ -868,6 +1339,46 @@ opSend=function(n,cn){
  toast('…');var tt=[w2,w3].filter(Boolean);
  api('POST','/api/traduci',{a:'it',testi:tt}).then(function(j){var o=j.out||[];var a=w2?o[0]:'',b=w3?o[w2?1:0]:'';if((w2&&!a)||(w3&&!b)){fine(w2,w3,false);return;}fine(a,b,true);}).catch(function(){fine(w2,w3,false);});
 };
+
+/* ===== TUTTO IL RESTO DEL GESTIONALE (dalle anteprime 02 e 05) dentro l'app online ===== */
+var PAT={"home": "<div class=\"card\">\n      <div class=\"punti\">\n        <div class=\"num\">38<small> / 100</small></div>\n        <div>\n          <div class=\"stato-ok\">Puoi lavorare in cantiere</div>\n          <div style=\"font-size:13px;color:var(--muted)\">23 punti sopra la soglia di 15</div>\n        </div>\n      </div>\n      <div class=\"barra\"><i style=\"width:38%\"></i><span class=\"soglia\" style=\"left:15%\"></span></div>\n      <div class=\"barra-leg\"><span>0</span><span style=\"color:var(--rosso)\">soglia 15</span><span>100</span></div>\n    </div>", "punti": "<div class=\"card\">\n      <div class=\"riga\"><div class=\"testo\">Punti di partenza<div class=\"d\">Uguali per tutti</div></div><span class=\"pt\">30</span></div>\n      <div class=\"riga\"><div class=\"testo\">Anzianità dell'impresa<div class=\"d\">Iscritta da 12 anni (da 11 a 15 anni)</div></div><span class=\"pt\">+5</span></div>\n      <div class=\"riga\"><div class=\"testo\">DVR adottato<div class=\"d\">Dichiarato sul portale</div></div><span class=\"pt\">+3</span></div>\n      <div class=\"riga\"><div class=\"testo\">Nessuna violazione<div class=\"d\">+1 ogni due anni senza decurtazioni · primo punto il 01/11/2026</div></div><span class=\"pt\">0</span></div>\n      <div class=\"riga\"><div class=\"testo\">Punti tolti<div class=\"d\">Nessuna decurtazione</div></div><span class=\"pt\" style=\"color:var(--verde)\">0</span></div>\n      <div class=\"totale\"><span>Totale</span><span>38</span></div>\n    </div>", "spettano": "<div class=\"card\">\n      <div style=\"font-size:13px;color:var(--muted);margin-bottom:6px\">Rispondi sì o no. Il programma ti dice quanti punti puoi ancora dichiarare sul portale dell'Ispettorato.</div>\n      <div class=\"riga\"><div class=\"testo\">Almeno un terzo dei dipendenti ha fatto formazione sulla sicurezza in più rispetto a quella obbligatoria?</div><span class=\"pt\">+6</span><div class=\"sino\" data-p=\"6\"><button onclick=\"sn(this,1)\">Sì</button><button class=\"on\" onclick=\"sn(this,0)\">No</button></div></div>\n      <div class=\"riga\"><div class=\"testo\">Hai fatto addestramento pratico sulla sicurezza ai dipendenti direttamente in cantiere?</div><span class=\"pt\">+3</span><div class=\"sino\" data-p=\"3\"><button onclick=\"sn(this,1)\">Sì</button><button class=\"on\" onclick=\"sn(this,0)\">No</button></div></div>\n      <div class=\"riga\"><div class=\"testo\">Il medico competente è venuto almeno due volte in cantiere con il rappresentante per la sicurezza?</div><span class=\"pt\">+2</span><div class=\"sino\" data-p=\"2\"><button onclick=\"sn(this,1)\">Sì</button><button class=\"on\" onclick=\"sn(this,0)\">No</button></div></div>\n      <div class=\"riga\"><div class=\"testo\">Hai dipendenti stranieri che hanno fatto un corso di lingua?</div><span class=\"pt\">+2</span><div class=\"sino\" data-p=\"2\"><button onclick=\"sn(this,1)\">Sì</button><button class=\"on\" onclick=\"sn(this,0)\">No</button></div></div>\n      <div class=\"totale\"><span>Punti che puoi ancora chiedere</span><span id=\"tot\">0</span></div>\n      <div style=\"font-size:12px;color:var(--muted);margin-top:8px\">Per ogni sì il programma mostra cosa allegare e dove cliccare sul portale.</div>\n    </div>", "scadenze": "<div class=\"card\">\n      <div class=\"riga\"><div class=\"ico\" style=\"background:var(--rosso)\"><svg viewBox=\"0 0 24 24\"><path d=\"M6 3h9l3 3v15H6z\"/></svg></div><div class=\"testo\">DURC<div class=\"d\">Scaduto il 20/10/2026</div></div><span class=\"badge\" style=\"background:var(--rosso)\">Scaduto</span></div>\n      <div class=\"riga\"><div class=\"ico\" style=\"background:var(--ambra)\"><svg viewBox=\"0 0 24 24\"><path d=\"M4 7l8-4 8 4-8 4z M7 9v5c0 2 10 2 10 0V9\"/></svg></div><div class=\"testo\">Aggiornamento formazione · L. Verdi<div class=\"d\">Entro il 15/11/2026</div></div><span class=\"badge\" style=\"background:var(--ambra)\">22 giorni</span></div>\n      <div class=\"riga\"><div class=\"ico\" style=\"background:var(--verde)\"><svg viewBox=\"0 0 24 24\"><path d=\"M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 11c0 5.5-7 10-7 10z\"/></svg></div><div class=\"testo\">Visita medica · M. Neri<div class=\"d\">03/06/2027</div></div><span class=\"badge\" style=\"background:var(--verde)\">In regola</span></div>\n      <div class=\"riga\"><div class=\"ico\" style=\"background:var(--verde)\"><svg viewBox=\"0 0 24 24\"><path d=\"M4 7l8-4 8 4-8 4z M7 9v5c0 2 10 2 10 0V9\"/></svg></div><div class=\"testo\">Formazione titolare<div class=\"d\">12/03/2029</div></div><span class=\"badge\" style=\"background:var(--verde)\">In regola</span></div>\n      <div class=\"riga\"><div class=\"ico\" style=\"background:var(--ardesia)\"><svg viewBox=\"0 0 24 24\"><path d=\"M6 3h9l3 3v15H6z M9 12h6M9 16h6\"/></svg></div><div class=\"testo\">DVR<div class=\"d\">Da rifare solo se cambia qualcosa in azienda</div></div><span class=\"badge\" style=\"background:var(--ardesia)\">Nessuna data</span></div>\n    </div>\n    <div class=\"leg\">\n      <span><span class=\"pallino\" style=\"background:var(--rosso)\"></span>Scaduto</span>\n      <span><span class=\"pallino\" style=\"background:var(--ambra)\"></span>Entro 30 giorni</span>\n      <span><span class=\"pallino\" style=\"background:var(--verde)\"></span>In regola</span>\n    </div>", "cartella": "<div class=\"card\">\n      <div class=\"riga\"><span class=\"spunta\"><svg viewBox=\"0 0 24 24\"><path d=\"M5 12l4 4 10-10\"/></svg></span><div class=\"testo\">Patente a crediti<div class=\"d\">Numero e punteggio aggiornati</div></div><span class=\"btn\">Mostra</span></div>\n      <div class=\"riga\"><span class=\"vuoto\"></span><div class=\"testo\">DURC<div class=\"d\" style=\"color:var(--rosso)\">Scaduto: caricare quello nuovo</div></div><span class=\"btn\">Carica</span></div>\n      <div class=\"riga\"><span class=\"spunta\"><svg viewBox=\"0 0 24 24\"><path d=\"M5 12l4 4 10-10\"/></svg></span><div class=\"testo\">Attestati di formazione<div class=\"d\">3 attestati</div></div><span class=\"btn\">Mostra</span></div>\n      <div class=\"riga\"><span class=\"spunta\"><svg viewBox=\"0 0 24 24\"><path d=\"M5 12l4 4 10-10\"/></svg></span><div class=\"testo\">Idoneità mediche<div class=\"d\">2 dipendenti</div></div><span class=\"btn\">Mostra</span></div>\n      <div class=\"riga\"><span class=\"spunta\"><svg viewBox=\"0 0 24 24\"><path d=\"M5 12l4 4 10-10\"/></svg></span><div class=\"testo\">Nomina RSPP<div class=\"d\">Titolare</div></div><span class=\"btn\">Mostra</span></div>\n    </div>"};
+function sn(b,v){var g=b.parentNode;g.querySelectorAll('button').forEach(function(x){x.classList.remove('on')});b.classList.add('on');g.dataset.v=v;calcola();}
+function calcola(){var t=0;document.querySelectorAll('.sino').forEach(function(g){if(g.dataset.v==='1')t+=parseInt(g.dataset.p,10);});var e=document.getElementById('tot');if(e)e.textContent='+'+t;}
+function patPage(){return '<div class="card">'+PAT.home+'</div>'+sez('pat-p','I punti dell\'impresa','Da dove vengono i 38 punti','<div class="card" style="margin:0">'+PAT.punti+'</div>')+sez('pat-s','Punti che ti spettano','Fino a 13 ancora da chiedere','<div class="card" style="margin:0">'+PAT.spettano+'</div>','a')+sez('pat-d','Scadenze dei documenti','1 scaduta, 1 in arrivo','<div class="card" style="margin:0">'+PAT.scadenze+'</div>','r')+sez('pat-c','Cartella da cantiere','Documenti da mostrare ai controlli','<div class="card" style="margin:0">'+PAT.cartella+'</div>');}
+var OLD={
+ 'patente':[patPage,'Patente a crediti'],
+ 't-ferie':[titFerie,'Ferie e permessi'],'t-docsub':[titDocSub,'Documenti dei subappaltatori'],'t-timbra':[titTimbra,'Come si timbra'],
+ 't-inc':[titInc,'Quasi incidenti e infortuni'],'t-mat':[titMat,'Materiali e furgone'],'t-comm':[function(){return titComm()+'<span class="btn grande" onclick="vai(\'com\')">Guarda come lo vede la Famiglia Rossi</span>';},'Pagina dei clienti'],
+ 't-rapportini':[titRapportini,'Rapportini'],'t-pres':[titPresenze,'Presenze'],
+ 'com':[comHome,'Come lo vede il cliente'],'c-foto':[comFoto,'Foto dei lavori'],'c-firme':[function(){return listaFirme(S2.firmeCom,'com');},'Da firmare'],'c-pag':[comPag,'Pagamenti'],'c-msg':[function(){return listaMsg(COM);},'Messaggi'],
+ 'o-ferie':[opFerie,'Ferie e permessi'],'o-firme':[function(){return listaFirme(S.firmeOp,'op');},'Da firmare'],'o-scadenze':[opScadenze,'Corsi e visite'],
+ 'o-tessera':[opTessera,'Tesserino'],'o-mat':[opMat,'Furgone'],'o-ore':[opOre,'Le mie ore']
+};
+var OPG=null;
+function vai(p){
+ if(!OLD[p]){draw();return;}
+ if(ROLE&&ROLE.indexOf('op:')===0){OPG=p;draw();return;}
+ var top=STACK[STACK.length-1];
+ if(top&&top[0]==='old'&&top[1]===p)draw();else{STACK.push(['old',p]);draw();}
+}
+PAGES.old=function(id){return OLD[id]?OLD[id][0]():'';};
+var _titoloDi=titoloDi;titoloDi=function(x){return x[0]==='old'&&OLD[x[1]]?OLD[x[1]][1]:_titoloDi(x);};
+function oldTiles(list){return '<div class="griglia" style="margin-top:8px">'+list.map(function(x){return '<button class="tile'+(x[4]?' '+x[4]:'')+'" onclick="vai(\''+x[0]+'\')">'+ico(x[1],x[2])+'<div class="t">'+x[3]+'</div></button>';}).join('')+'</div>';}
+/* titolare: le altre sezioni dentro Cantieri e Squadra */
+var _cantieriAll=cantieri;cantieri=function(){var nInc=S2.inc.filter(function(x){return x.stato!=='chiuso';}).length,nMat=S2.mat.reduce(function(a,m){return a+m.v.filter(function(x){return x[1]<x[2];}).length;},0);
+ return _cantieriAll()+'<div class="blk-t" style="margin-top:14px">Altro dei cantieri</div>'+oldTiles([['t-mat','materiali','oliva','Materiali e furgone',nMat?'avviso':''],['t-inc','incidente','rosso','Quasi incidenti',nInc?'avviso':''],['t-comm','committente','bronzo','Pagina dei clienti'],['t-timbra','qr','petrolio','Come si timbra']]);};
+PAGES.cant=cantieri;
+var _squadraAll=squadra;squadra=function(){var nF=S2.ferie.filter(function(f){return f.stato==='attesa';}).length,nD=S.docSub.filter(function(d){return d.stato==='attesa';}).length;
+ return _squadraAll()+'<div class="blk-t" style="margin-top:14px">Altro della squadra</div>'+oldTiles([['patente','tessera','blu','Patente a crediti'],['t-ferie','ferie','ambra','Ferie e permessi',nF?'avviso':''],['t-docsub','doc','bronzo','Documenti dei subappaltatori',nD?'avviso':''],['t-pres','presenze','petrolio','Presenze e ore']]);};
+PAGES.squadra=squadra;
+/* operaio: le altre cose in fondo a «Oggi» */
+var OLDL={'o-firme':'sign','o-scadenze':'courses','o-tessera':'card','o-mat':'van','o-ore':'myhours','o-ferie':'leave'};
+var _opDrawAll=opDraw;
+opDraw=function(n){OP=n;_opDrawAll(n);
+ if(OPG&&OLD[OPG]){document.getElementById('vista').innerHTML='<button class="back" onclick="OPG=null;paint()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>'+T('back')+'</button><div class="big-t" style="margin-top:8px">'+T(OLDL[OPG])+'</div>'+OLD[OPG][0]();return;}
+ if(OTAB==='oggi'){var fd=S.firmeOp.filter(function(f){return !f.fatto;}).length;document.getElementById('vista').insertAdjacentHTML('beforeend','<div class="blk-t" style="margin-top:14px">'+T('more')+'</div>'+oldTiles([['o-firme','firma','indaco',T('sign')+(fd?' · '+fd:''),fd?'avviso':''],['o-ferie','ferie','ambra',T('leave')],['o-scadenze','corso','indaco',T('courses')],['o-tessera','tessera','blu',T('card')],['o-mat','materiali','oliva',T('van')],['o-ore','ore','ardesia',T('myhours')]]));}
+};
+var _paintAll=paint;paint=function(){if(!ROLE||ROLE.indexOf('op:')!==0)OPG=null;_paintAll();};
 
 boot();
 
