@@ -487,10 +487,10 @@ function titMat(){
 }
 function ordina(pi,i){var x=S2.mat[pi].v[i];S2.ordine.push([x[0],x[2]*2-x[1],x[3]]);toast('Aggiunto all\'ordine');vai('t-mat');}
 function opMat(){
- var f=S2.mat[0];
+ var f=MIOF();if(!f)return '<div class="card"><div class="sotto" style="margin:0">Non hai un furgone assegnato.</div></div>';
  return '<div class="sotto">Quando prendi qualcosa dal furgone segnalo qui: il titolare vede cosa manca.</div><div class="card"><div class="lista">'+f.v.map(function(x,i){return riga('materiali',x[1]<x[2]?'ambra':'oliva',x[0],'Ci sono '+x[1]+' '+x[3],'<span class="btn" onclick="usa('+i+')">Ne ho usato 1</span>');}).join('')+'</div></div>';
 }
-function usa(i){var x=S2.mat[0].v[i];if(x[1]>0)x[1]--;toast('Segnato');vai('o-mat');}
+function usa(i){var x=MIOF().v[i];if(x[1]>0)x[1]--;toast('Segnato');vai('o-mat');}
 
 /* ===== F · ACCONTI E PAGAMENTI ===== */
 var colRata={pagato:'verde',attesa:'ambra',scaduto:'rosso',futuro:'ardesia'},txtRata={pagato:'Pagato',attesa:'In scadenza',scaduto:'Non pagato',futuro:'Più avanti'};
@@ -515,8 +515,10 @@ function titInc(){
 function chiudiInc(id){S2.inc.forEach(function(x){if(x.id===id){x.stato='chiuso';x.rimedio=x.rimedio||'Risolto dal titolare';}});toast('Segnato come risolto');vai('t-inc');}
 
 /* ===== H · TESSERINO DI RICONOSCIMENTO ===== */
+function FOP(){return ((S.firmeP||{})[OP])||[];}
+function MIOF(){var n=(S2.furg||{})[OP];return n?(S2.mat||[]).find(function(m){return m.p===n;}):null;}
 function opTessera(){
- return '<div class="tessera"><div class="fotot"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></div><div><div class="r">Lavoratore</div><div class="v">'+OP+'</div><div class="r">Datore di lavoro</div><div class="v">Idraulica Bianchi</div><div class="r">Assunto il</div><div class="v">01/03/2021</div></div></div>'+
+ return '<div class="tessera"><div class="fotot"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></div><div><div class="r">Lavoratore</div><div class="v">'+OP+'</div><div class="r">Datore di lavoro</div><div class="v">Idraulica Bianchi</div><div class="r">Assunto il</div><div class="v">'+(((S2.assunto||{})[OP])||'–')+'</div></div></div>'+
   '<div class="riquadro-avviso" style="margin-top:12px">Da verificare se il tesserino sul telefono vale come tessera di riconoscimento in cantiere. Finché non è chiarito, tenere anche quello di plastica.</div>';
 }
 
@@ -612,7 +614,7 @@ function titTimbra(){
  if(S.timbra.gps===false&&S.timbra._chiedi){
   h+='<div class="riquadro-avviso"><b>Prima di accendere la posizione</b><br>Serve l\'accordo con i sindacati oppure l\'autorizzazione dell\'Ispettorato del lavoro (articolo 4 dello Statuto dei lavoratori), e ogni operaio deve firmare l\'informativa.<label class="autodich" style="margin-bottom:0"><input type="checkbox" id="autCheck"> Ho l\'accordo sindacale o l\'autorizzazione dell\'Ispettorato</label><div class="barra-az" style="margin:8px 0 0"><span class="btn pieno" onclick="accendiGps()">Accendi la posizione</span><span class="btn" onclick="S.timbra._chiedi=false;vai(\'t-timbra\')">Annulla</span></div></div>';
  }
- if(S.timbra.gps){h+='<div class="sotto">Informativa: '+(S.firmeOp[2].fatto?'firmata da Luca Verdi':'da far firmare')+' · gli operai che non l\'hanno firmata la ricevono da firmare nell\'app.</div>';}
+ if(S.timbra.gps){h+='<div class="sotto">Informativa: '+(function(){var fp=S.firmeP||{},ok=Object.keys(fp).filter(function(n){return fp[n].some(function(f){return /timbratura/.test(f.t)&&f.fatto;});});return ok.length?'firmata da '+ok.join(', '):'da far firmare';})()+' · gli operai che non l\'hanno firmata la ricevono da firmare nell\'app.</div>';}
  if(S.timbra.qr){h+='<div class="card" style="text-align:center"><div style="font-weight:600">Foglio QR · Bagno via Roma 12</div><svg class="qr" viewBox="0 0 29 29">'+qrFinto()+'</svg><span class="btn">Stampa il foglio</span></div>';}
  return h;
 }
@@ -676,13 +678,16 @@ function opRapportino(){
   '<div class="barra-az"><span class="btn">Aggiungi foto</span></div><span class="btn pieno grande" onclick="toast(\'Rapportino inviato al titolare\');vai(\'op\')">Invia rapportino</span></div>';
 }
 function opOre(){
- var g=[['Lun 19',8,0],['Mar 20',8,0],['Mer 21',9,1],['Gio 22',8,0],['Ven 23',8,0]],h='<div class="card" style="padding:0"><table><tr><th>Giorno</th><th class="num-c">Ore</th><th class="num-c">Straordinario</th></tr>',t=0,s=0;
+ var g=((S.oreP||{})[OP])||[],h='<div class="card" style="padding:0"><table><tr><th>Giorno</th><th class="num-c">Ore</th><th class="num-c">Straordinario</th></tr>',t=0,s=0;
  g.forEach(function(x){t+=x[1];s+=x[2];h+='<tr><td>'+x[0]+'</td><td class="num-c">'+x[1]+'</td><td class="num-c">'+(x[2]||'–')+'</td></tr>';});
  return h+'<tr><th>Totale</th><th class="num-c">'+t+'</th><th class="num-c">'+s+'</th></tr></table></div>';
 }
 function opScadenze(){
- return '<div class="card"><div class="lista">'+riga('corso','ambra','Formazione lavoratori (aggiornamento)','Scade il 15/11/2026 · il titolare ti iscrive al corso',badge('ambra','In scadenza'))+riga('corso','verde','Lavori in quota','Scade il 10/04/2028',badge('verde','In regola'))+riga('corso','verde','Visita medica periodica','12/02/2027',badge('verde','In regola'))+'</div></div>';
+ var p=PERS.find(function(x){return x.n===OP;}),c=(p&&p.corsi)||[];
+ if(!c.length)return '<div class="card"><div class="sotto" style="margin:0">Nessun corso o visita segnati.</div></div>';
+ return '<div class="card"><div class="lista">'+c.map(function(x){var a=x[2]==='a';return riga('corso',a?'ambra':'verde',x[0],(a?'':'Scade il ')+x[1]+(a?' · il titolare ti iscrive al corso':''),badge(a?'ambra':'verde',a?'In scadenza':'In regola'));}).join('')+'</div></div>';
 }
+
 function listaFirme(arr,chi){
  return '<div class="card"><div class="lista">'+arr.map(function(f){
   return '<div class="riga">'+(f.fatto?SP:'<span class="vuoto"></span>')+'<div class="testo"><div class="n">'+f.t+'</div><div class="d">'+(f.fatto?'Firmato il '+f.fatto:'Da firmare')+'</div></div>'+(f.fatto?'<span class="btn">Mostra firma</span>':'<span class="btn pieno" onclick="apriFirma('+f.id+',\''+chi+'\')">Firma</span>')+'</div>';
@@ -734,7 +739,7 @@ function subOperai(){
 /* ===== FIRMA COL DITO ===== */
 var firmaCorrente=null, disegnato=false;
 function apriFirma(id,chi){
- var arr=chi==='sub'?S.firmeSub:(chi==='com'?S2.firmeCom:S.firmeOp); firmaCorrente=arr.find(function(f){return f.id===id;});
+ var arr=chi==='sub'?S.firmeSub:(chi==='com'?S2.firmeCom:FOP()); firmaCorrente=arr.find(function(f){return f.id===id;});
  document.getElementById('firmaTitolo').textContent=firmaCorrente.t;
  document.getElementById('firmaSotto').textContent=firmaCorrente.d;
  document.getElementById('firmaDich').textContent='Sono '+(chi==='sub'?'il titolare di '+SUB:(chi==='com'?'Mario Rossi':OP))+' e firmo questo documento.';
@@ -1351,7 +1356,7 @@ var OLD={
  't-inc':[titInc,'Quasi incidenti e infortuni'],'t-mat':[titMat,'Materiali e furgone'],'t-comm':[function(){return titComm()+'<span class="btn grande" onclick="vai(\'com\')">Guarda come lo vede la Famiglia Rossi</span>';},'Pagina dei clienti'],
  't-rapportini':[titRapportini,'Rapportini'],'t-pres':[titPresenze,'Presenze'],
  'com':[comHome,'Come lo vede il cliente'],'c-foto':[comFoto,'Foto dei lavori'],'c-firme':[function(){return listaFirme(S2.firmeCom,'com');},'Da firmare'],'c-pag':[comPag,'Pagamenti'],'c-msg':[function(){return listaMsg(COM);},'Messaggi'],
- 'o-ferie':[opFerie,'Ferie e permessi'],'o-firme':[function(){return listaFirme(S.firmeOp,'op');},'Da firmare'],'o-scadenze':[opScadenze,'Corsi e visite'],
+ 'o-ferie':[opFerie,'Ferie e permessi'],'o-firme':[function(){return listaFirme(FOP(),'op');},'Da firmare'],'o-scadenze':[opScadenze,'Corsi e visite'],
  'o-tessera':[opTessera,'Tesserino'],'o-mat':[opMat,'Furgone'],'o-ore':[opOre,'Le mie ore']
 };
 var OPG=null;
@@ -1376,7 +1381,7 @@ var OLDL={'o-firme':'sign','o-scadenze':'courses','o-tessera':'card','o-mat':'va
 var _opDrawAll=opDraw;
 opDraw=function(n){OP=n;_opDrawAll(n);
  if(OPG&&OLD[OPG]){document.getElementById('vista').innerHTML='<button class="back" onclick="OPG=null;paint()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>'+T('back')+'</button><div class="big-t" style="margin-top:8px">'+T(OLDL[OPG])+'</div>'+OLD[OPG][0]();return;}
- if(OTAB==='oggi'){var fd=S.firmeOp.filter(function(f){return !f.fatto;}).length;document.getElementById('vista').insertAdjacentHTML('beforeend','<div class="blk-t" style="margin-top:14px">'+T('more')+'</div>'+oldTiles([['o-firme','firma','indaco',T('sign')+(fd?' · '+fd:''),fd?'avviso':''],['o-ferie','ferie','ambra',T('leave')],['o-scadenze','corso','indaco',T('courses')],['o-tessera','tessera','blu',T('card')],['o-mat','materiali','oliva',T('van')],['o-ore','ore','ardesia',T('myhours')]]));}
+ if(OTAB==='oggi'){var fd=FOP().filter(function(f){return !f.fatto;}).length;document.getElementById('vista').insertAdjacentHTML('beforeend','<div class="blk-t" style="margin-top:14px">'+T('more')+'</div>'+oldTiles([['o-firme','firma','indaco',T('sign')+(fd?' · '+fd:''),fd?'avviso':''],['o-ferie','ferie','ambra',T('leave')],['o-scadenze','corso','indaco',T('courses')],['o-tessera','tessera','blu',T('card')],['o-mat','materiali','oliva',T('van')],['o-ore','ore','ardesia',T('myhours')]]));}
 };
 var _paintAll=paint;paint=function(){if(!ROLE||ROLE.indexOf('op:')!==0)OPG=null;_paintAll();};
 

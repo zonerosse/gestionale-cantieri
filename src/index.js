@@ -6,13 +6,96 @@
 //  - ogni dispositivo approvato ha una chiave segreta (id:chiave nell'intestazione X-Disp) e rientra da solo.
 // API: POST /api/disp/richiesta {ruolo,n,pin,data?} · GET /api/disp/stato?id&k · POST /api/disp/azione {op,id} (titolare)
 //      GET/PUT /api/stato (con X-Disp) come prima: {ver,data,io,disp?} · 409 se qualcuno ha salvato nel frattempo
-// NB: è una PROVA. Nella versione vera il server deve filtrare cosa vede e cosa può cambiare ogni operaio.
+// Ogni operaio riceve solo i suoi dati (vista) e quando salva il server prende solo ciò che può cambiare lui (unisci).
 import { DurableObject } from "cloudflare:workers";
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const rnd = n => [...crypto.getRandomValues(new Uint8Array(n))].map(b => b.toString(16).padStart(2, "0")).join("");
 const LINGUE = { it: "italiano", en: "inglese", ro: "romeno", sq: "albanese", ar: "arabo", uk: "ucraino", fr: "francese" };
 const sha = async t => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)))].slice(0, 12).map(b => b.toString(16).padStart(2, "0")).join("");
 const cod4 = () => String(1000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 9000));
+
+
+// ---- Ogni operaio vede e cambia solo quello che gli compete ----
+const esc = v => String(v == null ? "" : v).replace(/[<>&"']/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" }[c])).slice(0, 2000);
+const ORA = v => /^\d{1,2}:\d{2}$/.test(v || "") ? v : "";
+const first = n => String(n || "").split(" ")[0];
+// dati per persona (firme, ore, furgone, assunzione): si creano da soli se mancano
+function migra(d) {
+  d.S = d.S || {}; d.S2 = d.S2 || {}; const P = d.PERS || [], S = d.S, S2 = d.S2;
+  const base = S.firmeOp || [];
+  S.firmeP = S.firmeP || {};
+  for (const p of P) if (!S.firmeP[p.n]) {
+    const cal = JSON.stringify(p.cal || []);
+    S.firmeP[p.n] = base.filter(f => { const m = /·\s*(.+)$/.exec(f.t || ""); return !m || cal.includes(m[1]); }).map(f => Object.assign({}, f));
+  }
+  if (!S.oreP) {
+    S.oreP = {};
+    const gg = ["Lun 19", "Mar 20", "Mer 21", "Gio 22", "Ven 23"];
+    P.forEach((p, i) => { S.oreP[p.n] = gg.map((g, j) => [g, i === 0 && j === 2 ? 9 : (i === 2 && j === 4 ? 6 : 8), i === 0 && j === 2 ? 1 : 0]); });
+  }
+  for (const p of P) if (!S.oreP[p.n]) S.oreP[p.n] = [];
+  if (!S2.furg) { S2.furg = {}; P.forEach((p, i) => { if (i < 2 && (S2.mat || [])[0]) S2.furg[p.n] = S2.mat[0].p; }); }
+  if (!S2.assunto) { S2.assunto = {}; const a = ["01/03/2021", "15/06/2019", "10/01/2024"]; P.forEach((p, i) => { S2.assunto[p.n] = a[i] || ""; }); }
+  return d;
+}
+const MIEI_CANT = (d, n) => { const p = (d.PERS || []).find(x => x.n === n); const t = JSON.stringify(p ? p.cal || [] : []); return (d.CANT || []).filter(c => t.includes(c.n)); };
+// cosa riceve l'operaio n
+function vista(d, n) {
+  const p = (d.PERS || []).find(x => x.n === n), S = d.S || {}, S2 = d.S2 || {}, mio = x => x && x.n === n;
+  const msg = (d.MSGS || []).filter(m => (m.dest || []).includes(n)).map(m => ({ id: m.id, a: m.dest.length > 1 ? m.a : n, t: m.t, ora: m.ora, dest: [n], letti: m.letti && m.letti[n] ? { [n]: m.letti[n] } : {} }));
+  const furg = (S2.furg || {})[n];
+  return {
+    CANT: MIEI_CANT(d, n).map(c => ({ n: c.n, lav: c.lav, cl: c.cl, ind: c.ind, cap: c.cap, citta: c.citta, pr: c.pr, ora: c.ora, dal: c.dal, al: c.al, col: c.col, note: c.note })),
+    PERS: p ? [p] : [], TODO: [], AVV: {},
+    REQ: mio(d.REQ) ? d.REQ : null, REQQ: (d.REQQ || []).filter(mio),
+    RISP: d.RISP && d.RISP[n] ? { [n]: d.RISP[n] } : {}, MSGS: msg,
+    NOTIF: d.NOTIF && d.NOTIF[n] ? { [n]: d.NOTIF[n] } : {},
+    S: { timbra: S.timbra, messaggi: [], presenze: (S.presenze || []).filter(mio), firmeOp: [], firmeSub: [], firmeP: { [n]: (S.firmeP || {})[n] || [] }, oreP: { [n]: (S.oreP || {})[n] || [] }, timbOp: { e: "", u: "" }, segnalazioni: [], rapportini: [], docSub: [] },
+    S2: { giorni: S2.giorni, colori: S2.colori, posti: [], cal: {}, ferie: (S2.ferie || []).filter(f => f.chi === n), costi: [], pag: [], ordine: [], inc: [], foto: [], firmeCom: [], avanz: { perc: 0, fasi: [] },
+      mat: (S2.mat || []).filter(m => m.p === furg), furg: furg ? { [n]: furg } : {}, assunto: { [n]: (S2.assunto || {})[n] || "" } }
+  };
+}
+// quello che manda l'operaio n: si prende solo ciò che può cambiare lui, ripulito
+function unisci(full, m, n) {
+  const d = JSON.parse(JSON.stringify(full)), mio = x => x && x.n === n, key = r => r.ora + "|" + r.t;
+  // timbratura
+  const p = (d.PERS || []).find(mio), pm = (m.PERS || []).find(mio);
+  if (p && pm) { p.e = ORA(pm.e) || p.e || ""; p.u = p.e ? (ORA(pm.u) || p.u || "") : ""; }
+  // «dove vado?»: le sue richieste
+  const sue = [m.REQ].concat(m.REQQ || []).filter(mio).map(r => ({ n, ora: ORA(r.ora), da: esc(r.da), t: esc(r.t) }));
+  const ks = new Set(sue.map(key)), gia = new Set();
+  if (mio(d.REQ)) { if (ks.has(key(d.REQ))) gia.add(key(d.REQ)); else d.REQ = null; }
+  d.REQQ = (d.REQQ || []).filter(r => !mio(r) || (ks.has(key(r)) && gia.add(key(r))));
+  for (const r of sue) if (!gia.has(key(r))) { if (!d.REQ) d.REQ = r; else d.REQQ.push(r); }
+  // risposta del titolare: l'operaio può solo toglierla (Ok)
+  if (d.RISP && d.RISP[n] && !(m.RISP && m.RISP[n])) delete d.RISP[n];
+  // avvisi del titolare: può solo toglierli («Ok, ho visto»)
+  if (d.NOTIF && d.NOTIF[n]) { const resta = new Set(((m.NOTIF || {})[n] || []).map(x => JSON.stringify(x))); d.NOTIF[n] = d.NOTIF[n].filter(x => resta.has(JSON.stringify(x))); }
+  // messaggi: solo «letto»
+  const lm = {}; (m.MSGS || []).forEach(x => { if (x && x.letti && x.letti[n]) lm[x.id] = x.letti[n]; });
+  (d.MSGS || []).forEach(x => { if ((x.dest || []).includes(n) && lm[x.id] && !(x.letti || {})[n]) { x.letti = x.letti || {}; x.letti[n] = esc(lm[x.id]).slice(0, 20); } });
+  // rapportini e segnalazioni (vanno nelle cose da fare del titolare); i tasti li rimette il server
+  const ids = new Set((d.TODO || []).map(t => t.id)), nuovi = [];
+  for (const t of (m.TODO || []).slice(0, 10)) {
+    if (!t || !/^w\d{6,16}$/.test(t.id || "") || ids.has(t.id)) continue;
+    const rap = /^Rapportino/.test(t.t || "");
+    nuovi.push({ id: t.id, da: n, t: esc(t.t).slice(0, 200), s: esc(t.s).slice(0, 1500),
+      b: rap ? [["Approva", "fatto('" + t.id + "','Approvato')"], ["Rimanda", "fatto('" + t.id + "','Rimandato a " + esc(first(n)).replace(/&#39;/g, "") + "')"]] : [["Risolto", "fatto('" + t.id + "','Segnato come risolto')"]] });
+  }
+  d.TODO = nuovi.concat(d.TODO || []);
+  // firme: solo i suoi documenti, solo la firma
+  const fp = ((d.S || {}).firmeP || {})[n], fm = ((((m.S || {}).firmeP) || {})[n]) || [];
+  if (fp) fp.forEach(f => { const x = fm.find(y => y && y.id === f.id); if (!f.fatto && x && x.fatto) f.fatto = esc(x.fatto).slice(0, 20); });
+  // ferie e permessi: le sue richieste (lo stato lo decide il titolare)
+  const S2 = d.S2 = d.S2 || {}, vec = (S2.ferie || []).filter(f => f.chi === n);
+  const fe = ((m.S2 || {}).ferie || []).filter(f => f && f.chi === n).slice(0, 30).map(f => { const o = vec.find(v => v.id === f.id);
+    return o || { id: +f.id || Date.now(), chi: n, tipo: f.tipo === "Permesso" ? "Permesso" : "Ferie", dal: esc(f.dal).slice(0, 10), al: esc(f.al).slice(0, 10), gi: [], stato: "attesa", nota: esc(f.nota).slice(0, 300) }; });
+  S2.ferie = (S2.ferie || []).filter(f => f.chi !== n).concat(fe);
+  // furgone: può solo segnare quello che usa (le quantità scendono)
+  const fu = (S2.furg || {})[n], mv = (S2.mat || []).find(x => x.p === fu), mm = ((m.S2 || {}).mat || []).find(x => x && x.p === fu);
+  if (mv && mm) mv.v.forEach((r, i) => { const q = mm.v && mm.v[i] && +mm.v[i][1]; if (Number.isFinite(q) && q >= 0 && q < r[1]) r[1] = q; });
+  return d;
+}
 
 export class Stato extends DurableObject {
   async fetch(request) {
@@ -91,18 +174,21 @@ export class Stato extends DurableObject {
     if (p === "/api/stato") {
       const row = await st.get("main");
       if (!row) return J({ vuoto: true });
-      const io = { r: me.ruolo, n: me.n, id };
-      const extra = me.ruolo === "tit" ? { disp: pub() } : {};
+      const io = { r: me.ruolo, n: me.n, id }, tit = me.ruolo === "tit";
+      const extra = tit ? { disp: pub() } : {};
       if (request.method === "GET") {
         if (+url.searchParams.get("since") === row.ver && !url.searchParams.get("all")) return J(Object.assign({ same: true, ver: row.ver }, extra));
-        return J(Object.assign({ ver: row.ver, data: JSON.parse(row.json), io }, extra));
+        const full = migra(JSON.parse(row.json)), mj = JSON.stringify(full);
+        if (mj !== row.json) await st.put("main", { json: mj, ver: row.ver });
+        return J(Object.assign({ ver: row.ver, data: tit ? full : vista(full, me.n), io }, extra));
       }
       if (request.method === "PUT") {
         const txt = await request.text();
         if (txt.length > 1800000) return J({ errore: "Troppi dati" }, 413);
         let b; try { b = JSON.parse(txt); } catch (e) { return J({ errore: "Dati non validi" }, 400); }
         if (b.ver !== row.ver) return J({ ver: row.ver, data: JSON.parse(row.json) }, 409);
-        const nd = b.data || {}; delete nd.accessi;
+        let nd = b.data || {}; delete nd.accessi;
+        nd = tit ? migra(nd) : unisci(migra(JSON.parse(row.json)), nd, me.n);
         await st.put("main", { json: JSON.stringify(nd), ver: row.ver + 1 });
         return J({ ver: row.ver + 1 });
       }
